@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+web-build/
+
+# Env files (keep .env.example)
+.env
+.env.local
+.env*.local
+
+# Expo
+.expo/
+
+# OS / editor
+.DS_Store
+*.log

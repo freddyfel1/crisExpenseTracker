@@ -1,0 +1,86 @@
+@import 'tailwindcss';
+
+:root {
+  --paper: #f2f4ef;
+  --surface: #ffffff;
+  --ink: #121a15;
+  --text: #4c5249;
+  --text-soft: #7c8175;
+  --border: #dfe2d8;
+  --border-soft: #eaece4;
+
+  --primary: #2f6f52;
+  --primary-ink: #1e4a37;
+  --primary-soft: #e4efe7;
+
+  --warn: #b4483a;
+  --warn-soft: #f6e7e2;
+
+  --gold: #b3872f;
+  --gold-soft: #f3ecd9;
+
+  --font-display: 'Source Serif 4', Georgia, serif;
+  --font-sans: 'Inter', system-ui, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+  font-family: inherit;
+}
+
+.input:focus {
+  border-color: var(--primary);
+}

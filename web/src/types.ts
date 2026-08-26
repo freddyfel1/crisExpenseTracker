@@ -1,0 +1,36 @@
+export type CategoryId = string
+
+export interface Category {
+  id: CategoryId
+  name: string
+  icon: string
+  color: string
+}
+
+export interface Transaction {
+  id: string
+  date: string // ISO date
+  merchant: string
+  categoryId: CategoryId | null
+  amount: number
+  paymentMethod: string | null
+  tax?: number | null
+  tip?: number | null
+  notes?: string | null
+  tags: string[]
+  receiptImagePath?: string | null
+}
+
+export interface Budget {
+  categoryId: CategoryId
+  monthlyLimit: number
+}
+
+export interface Profile {
+  id: string
+  name: string
+  currency: string
+  notifyBudgetAlerts: boolean
+  notifyWeeklySummary: boolean
+  notifyReceiptSync: boolean
+}
