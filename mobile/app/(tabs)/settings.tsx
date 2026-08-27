@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
-import { LogOut } from 'lucide-react-native'
+import { useRouter } from 'expo-router'
+import { ChevronRight, ClipboardList, LogOut } from 'lucide-react-native'
 import { useProfile, useUpdateProfile } from '../../src/hooks/useAppData'
 import { useSession } from '../../src/hooks/useSession'
 import { supabase } from '../../src/lib/supabase'
@@ -7,6 +8,7 @@ import { colors } from '../../src/theme'
 
 export default function Settings() {
   const { session } = useSession()
+  const router = useRouter()
   const profile = useProfile()
   const updateProfile = useUpdateProfile()
 
@@ -31,6 +33,16 @@ export default function Settings() {
           <Text style={styles.rowLabel}>{profile.data.name || 'No name set'}</Text>
           <Text style={styles.meta}>{session?.user.email}</Text>
         </View>
+
+        <Pressable style={styles.card} onPress={() => router.push('/planner')}>
+          <View style={styles.row}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <ClipboardList size={18} color={colors.primary} />
+              <Text style={styles.rowLabel}>Budget Planner</Text>
+            </View>
+            <ChevronRight size={18} color={colors.textSoft} />
+          </View>
+        </Pressable>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Notifications</Text>

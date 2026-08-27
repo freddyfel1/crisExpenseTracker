@@ -4,6 +4,7 @@ import {
   Receipt,
   Tags,
   PiggyBank,
+  ClipboardList,
   BarChart3,
   Settings as SettingsIcon,
   Wallet,
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/transactions', label: 'Transactions', icon: Receipt },
   { to: '/categories', label: 'Categories', icon: Tags },
   { to: '/budgets', label: 'Budgets', icon: PiggyBank },
+  { to: '/planner', label: 'Planner', icon: ClipboardList },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
