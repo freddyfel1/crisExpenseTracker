@@ -37,11 +37,8 @@ EXPO_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
 ```
 
-Once both are set, restart the dev servers. The web app currently runs on mock
-localStorage data — that's a separate data layer (`web/src/data/store.tsx`) and won't
-switch to Supabase automatically. Say the word when you're ready and I'll wire it up
-(swap the store for live queries) — I held off so the working demo doesn't break
-before you've actually got a project to point it at.
+Once both are set, restart the dev servers. Both apps read and write straight to
+Supabase — there's no separate mock/localStorage data layer to switch off.
 
 ## 5. (Later) Enable email auth
 

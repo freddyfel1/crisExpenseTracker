@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Categories } from './pages/Categories'
 import { Budgets } from './pages/Budgets'
+import { Planner } from './pages/Planner'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
 
@@ -20,6 +21,7 @@ function App() {
             <Route path="/transactions/:id" element={<Transactions />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/budgets" element={<Budgets />} />
+            <Route path="/planner" element={<Planner />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

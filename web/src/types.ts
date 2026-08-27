@@ -26,10 +26,28 @@ export interface Budget {
   monthlyLimit: number
 }
 
+export interface BudgetSection {
+  id: string
+  name: string
+  sortOrder: number
+}
+
+export interface BudgetLineItem {
+  id: string
+  sectionId: string
+  name: string
+  monthlyAmount: number
+  miscInfo: string | null
+  remarks: string | null
+  sortOrder: number
+}
+
 export interface Profile {
   id: string
   name: string
   currency: string
+  monthlyIncome: number
+  monthlySavings: number
   notifyBudgetAlerts: boolean
   notifyWeeklySummary: boolean
   notifyReceiptSync: boolean
