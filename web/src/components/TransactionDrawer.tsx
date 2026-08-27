@@ -72,9 +72,7 @@ export function TransactionDrawer({ id, onClose }: Props) {
         <div className="mb-5 flex items-center gap-3">
           <ReceiptThumb color={category.color} size={56} />
           <p className="text-[12px] text-[var(--text-soft)]">
-            {isNew
-              ? 'Manually entered — receipts captured on mobile sync here automatically.'
-              : 'Extracted from receipt photo on the mobile app.'}
+            {draft.receiptImagePath ? 'Extracted from a receipt photo.' : 'Manually entered.'}
           </p>
         </div>
 

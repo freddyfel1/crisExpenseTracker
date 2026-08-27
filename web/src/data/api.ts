@@ -190,3 +190,29 @@ export async function getReceiptSignedUrl(path: string): Promise<string | null> 
   if (error) return null
   return data.signedUrl
 }
+
+export async function uploadReceiptPhoto(userId: string, file: File): Promise<string> {
+  const path = `${userId}/${Date.now()}.jpg`
+  const { error } = await supabase.storage.from('receipts').upload(path, file, {
+    contentType: file.type || 'image/jpeg',
+  })
+  if (error) throw error
+  return path
+}
+
+export interface ParsedReceipt {
+  merchant?: string
+  date?: string | null
+  amount?: number
+  tax?: number | null
+  tip?: number | null
+  categoryId?: string | null
+  confidence?: 'high' | 'medium' | 'low'
+  error?: string
+}
+
+export async function parseReceipt(path: string): Promise<ParsedReceipt> {
+  const { data, error } = await supabase.functions.invoke('parse-receipt', { body: { path } })
+  if (error) throw error
+  return data as ParsedReceipt
+}

@@ -53,7 +53,7 @@ export function Sidebar() {
 
       <div className="mt-auto rounded-lg border border-[var(--border-soft)] bg-[var(--paper)] p-3">
         <p className="text-[12px] text-[var(--text-soft)]">
-          Receipts are captured on the crisExpenseTracker mobile app and synced here automatically.
+          Capture a receipt here or on the crisExpenseTracker mobile app — either way it syncs automatically.
         </p>
       </div>
     </aside>

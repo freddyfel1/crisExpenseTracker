@@ -7,6 +7,7 @@ import { formatDate, formatMoney } from '../utils/format'
 import { ReceiptThumb } from '../components/ReceiptThumb'
 import { CategoryIcon } from '../components/CategoryIcon'
 import { TransactionDrawer } from '../components/TransactionDrawer'
+import { CaptureReceiptButton } from '../components/CaptureReceiptButton'
 
 type SortKey = 'date' | 'amount' | 'merchant'
 
@@ -57,12 +58,15 @@ export function Transactions() {
           <h1 className="font-display text-[26px] text-[var(--ink)]">Transactions</h1>
           <p className="text-[13px] text-[var(--text-soft)]">{filtered.length} transactions</p>
         </div>
-        <button
-          onClick={() => navigate('/transactions/new')}
-          className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
-        >
-          <Plus size={15} /> Add transaction
-        </button>
+        <div className="flex items-center gap-2">
+          <CaptureReceiptButton />
+          <button
+            onClick={() => navigate('/transactions/new')}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
+          >
+            <Plus size={15} /> Add transaction
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
