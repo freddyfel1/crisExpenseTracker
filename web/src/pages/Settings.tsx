@@ -9,13 +9,17 @@ import { Card } from '../components/Card'
 
 export function Settings() {
   const { session } = useSession()
-  const userId = session!.user.id
+  const userId = session?.user.id
   const queryClient = useQueryClient()
   const { transactions, categories, budgets } = useStore()
 
-  const profileQuery = useQuery({ queryKey: ['profile', userId], queryFn: () => fetchProfile(userId) })
+  const profileQuery = useQuery({
+    queryKey: ['profile', userId],
+    queryFn: () => fetchProfile(userId!),
+    enabled: Boolean(userId),
+  })
   const saveProfile = useMutation({
-    mutationFn: (patch: Partial<Profile>) => updateProfile(userId, patch),
+    mutationFn: (patch: Partial<Profile>) => updateProfile(userId!, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile', userId] }),
   })
 

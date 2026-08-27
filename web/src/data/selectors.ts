@@ -1,4 +1,4 @@
-import type { Budget, Transaction } from '../types'
+import type { Transaction } from '../types'
 import { monthKey } from '../utils/format'
 
 export const transactionsForMonth = (transactions: Transaction[], month: string): Transaction[] =>
@@ -37,9 +37,6 @@ export const transactionsForCurrentWeek = (transactions: Transaction[]): Transac
     return d >= start && d < end
   })
 }
-
-export const totalBudget = (budgets: Budget[]): number =>
-  budgets.reduce((sum, b) => sum + b.monthlyLimit, 0)
 
 export const spendTrend = (transactions: Transaction[], monthsBack: number) => {
   const now = new Date()

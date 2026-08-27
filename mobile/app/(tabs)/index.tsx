@@ -1,17 +1,20 @@
-import { ActivityIndicator, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useBudgets, useCategories, useTransactions } from '../../src/hooks/useAppData'
-import { currentMonthKey, spendByCategory, totalBudget, totalSpend, transactionsForMonth } from '../../src/data/selectors'
+import { useCategories, useProfile, useTransactions, useUpdateProfile } from '../../src/hooks/useAppData'
+import { currentMonthKey, spendByCategory, totalSpend, transactionsForMonth } from '../../src/data/selectors'
 import { formatMoney, monthKeyLabel } from '../../src/utils/format'
 import { colors } from '../../src/theme'
 
 export default function Home() {
   const transactions = useTransactions()
   const categories = useCategories()
-  const budgets = useBudgets()
+  const profile = useProfile()
+  const updateProfile = useUpdateProfile()
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
+  const [editingIncome, setEditingIncome] = useState(false)
+  const [incomeDraft, setIncomeDraft] = useState('')
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -19,7 +22,7 @@ export default function Home() {
     setRefreshing(false)
   }, [queryClient])
 
-  if (transactions.isLoading || categories.isLoading || budgets.isLoading) {
+  if (transactions.isLoading || categories.isLoading || profile.isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
@@ -31,9 +34,15 @@ export default function Home() {
   const monthTxns = transactionsForMonth(transactions.data ?? [], month)
   const spend = spendByCategory(monthTxns)
   const spent = totalSpend(monthTxns)
-  const budget = totalBudget(budgets.data ?? [])
-  const remaining = budget - spent
+  const income = profile.data?.monthlyIncome ?? 0
+  const difference = income - spent
   const categoryById = new Map((categories.data ?? []).map((c) => [c.id, c]))
+
+  const commitIncome = () => {
+    const parsed = Number(incomeDraft)
+    if (!Number.isNaN(parsed)) updateProfile.mutate({ monthlyIncome: parsed })
+    setEditingIncome(false)
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -45,17 +54,41 @@ export default function Home() {
         <Text style={styles.subtitle}>{monthKeyLabel(month)}</Text>
 
         <View style={styles.statRow}>
-          <View style={[styles.statCard, { marginRight: 8 }]}>
-            <Text style={styles.statLabel}>TOTAL SPEND</Text>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>INCOME</Text>
+            {editingIncome ? (
+              <TextInput
+                autoFocus
+                style={[styles.statValue, styles.statInput]}
+                keyboardType="decimal-pad"
+                value={incomeDraft}
+                onChangeText={setIncomeDraft}
+                onBlur={commitIncome}
+                onSubmitEditing={commitIncome}
+              />
+            ) : (
+              <Pressable
+                onPress={() => {
+                  setIncomeDraft(String(income))
+                  setEditingIncome(true)
+                }}
+              >
+                <Text style={styles.statValue}>{formatMoney(income)}</Text>
+              </Pressable>
+            )}
+            <Text style={styles.statSub}>{editingIncome ? 'editing…' : 'tap to edit'}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>TOTAL EXPENSE</Text>
             <Text style={styles.statValue}>{formatMoney(spent)}</Text>
             <Text style={styles.statSub}>{monthTxns.length} transactions</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>REMAINING</Text>
-            <Text style={[styles.statValue, { color: remaining < 0 ? colors.warn : colors.primary }]}>
-              {formatMoney(remaining)}
+            <Text style={styles.statLabel}>DIFFERENCE</Text>
+            <Text style={[styles.statValue, { color: difference < 0 ? colors.warn : colors.primary }]}>
+              {formatMoney(difference)}
             </Text>
-            <Text style={styles.statSub}>of {formatMoney(budget)}</Text>
+            <Text style={styles.statSub}>income minus expense</Text>
           </View>
         </View>
 
@@ -87,9 +120,10 @@ const styles = StyleSheet.create({
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
   subtitle: { fontSize: 13, color: colors.textSoft, marginTop: -8 },
-  statRow: { flexDirection: 'row' },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statCard: {
     flex: 1,
+    minWidth: 100,
     backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
@@ -98,6 +132,7 @@ const styles = StyleSheet.create({
   },
   statLabel: { fontSize: 10, color: colors.textSoft, letterSpacing: 0.5 },
   statValue: { fontSize: 22, fontWeight: '600', color: colors.ink, marginTop: 4 },
+  statInput: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 2 },
   statSub: { fontSize: 12, color: colors.textSoft, marginTop: 4 },
   card: {
     backgroundColor: colors.surface,

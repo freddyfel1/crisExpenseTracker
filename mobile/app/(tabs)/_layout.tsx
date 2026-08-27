@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import { Camera, LayoutDashboard, Receipt, Settings as SettingsIcon } from 'lucide-react-native'
+import { Camera, FileSpreadsheet, LayoutDashboard, Receipt, Settings as SettingsIcon } from 'lucide-react-native'
 import { colors } from '../../src/theme'
 
 export default function TabsLayout() {
@@ -23,6 +23,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="capture"
         options={{ title: 'Capture', tabBarIcon: ({ color, size }) => <Camera color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="budget-planner"
+        options={{ title: 'Planner', tabBarIcon: ({ color, size }) => <FileSpreadsheet color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="settings"

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -54,16 +55,20 @@ export default function TransactionDetail() {
   }
 
   const remove = () => {
+    const doDelete = async () => {
+      await deleteTransaction.mutateAsync(draft.id)
+      router.back()
+    }
+
+    if (Platform.OS === 'web') {
+      // react-native-web's Alert.alert doesn't support interactive buttons.
+      if (window.confirm('Delete transaction? This cannot be undone.')) doDelete()
+      return
+    }
+
     Alert.alert('Delete transaction', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteTransaction.mutateAsync(draft.id)
-          router.back()
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: doDelete },
     ])
   }
 

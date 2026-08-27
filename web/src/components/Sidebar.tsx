@@ -3,17 +3,17 @@ import {
   LayoutDashboard,
   Receipt,
   Tags,
-  PiggyBank,
   BarChart3,
   Settings as SettingsIcon,
   Wallet,
+  FileSpreadsheet,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/transactions', label: 'Transactions', icon: Receipt },
   { to: '/categories', label: 'Categories', icon: Tags },
-  { to: '/budgets', label: 'Budgets', icon: PiggyBank },
+  { to: '/budget-planner', label: 'Budget Planner', icon: FileSpreadsheet },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

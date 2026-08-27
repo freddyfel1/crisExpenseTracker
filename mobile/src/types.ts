@@ -23,11 +23,6 @@ export interface Transaction {
   receiptImagePath?: string | null
 }
 
-export interface Budget {
-  categoryId: CategoryId
-  monthlyLimit: number
-}
-
 export interface Profile {
   id: string
   name: string
@@ -35,4 +30,22 @@ export interface Profile {
   notifyBudgetAlerts: boolean
   notifyWeeklySummary: boolean
   notifyReceiptSync: boolean
+  monthlyIncome: number
+  monthlySavings: number
+}
+
+export interface BudgetSection {
+  id: string
+  name: string
+  sortOrder: number
+}
+
+export interface BudgetLineItem {
+  id: string
+  sectionId: string
+  name: string
+  monthlyAmount: number
+  miscInfo: string | null
+  remarks: string | null
+  sortOrder: number
 }

@@ -1,28 +1,27 @@
-import { TrendingUp, Wallet, PiggyBank } from 'lucide-react'
+import { TrendingUp, Wallet, Scale, Landmark } from 'lucide-react'
 import { useStore } from '../data/store'
 import { usePeriod } from '../data/period'
-import { spendByCategory, spendTrend, totalBudget, totalSpend, transactionsForMonth } from '../data/selectors'
+import { spendByCategory, spendTrend, totalSpend, transactionsForMonth } from '../data/selectors'
 import { formatMoney, monthKeyLabel } from '../utils/format'
-import { buildBudgetTips } from '../utils/tips'
 import { Card } from '../components/Card'
 import { StatCard } from '../components/StatCard'
+import { EditableStatCard } from '../components/EditableStatCard'
 import { MonthPicker } from '../components/MonthPicker'
 import { CategoryBreakdown } from '../components/CategoryBreakdown'
 import { SpendTrend } from '../components/SpendTrend'
-import { FinancialHealth } from '../components/FinancialHealth'
-import { BudgetTips } from '../components/BudgetTips'
+import { IncomeExpenseTrend } from '../components/IncomeExpenseTrend'
 
 export function Dashboard() {
-  const { transactions, categories, budgets } = useStore()
+  const { transactions, categories, profile, updateProfile } = useStore()
   const { month } = usePeriod()
 
   const monthTxns = transactionsForMonth(transactions, month)
   const spend = spendByCategory(monthTxns)
   const spent = totalSpend(monthTxns)
-  const budget = totalBudget(budgets)
-  const remaining = budget - spent
+  const income = profile?.monthlyIncome ?? 0
+  const difference = income - spent
   const trend = spendTrend(transactions, 6)
-  const tips = buildBudgetTips(spend, budgets, categories)
+  const incomeExpenseTrend = trend.map((m) => ({ label: m.label, income, expense: m.total }))
 
   return (
     <div className="space-y-6">
@@ -36,19 +35,26 @@ export function Dashboard() {
         <MonthPicker />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <EditableStatCard
+          label="Income"
+          value={income}
+          sub="tap to edit"
+          icon={<Landmark size={16} className="text-[var(--text-soft)]" />}
+          onSave={(v) => updateProfile({ monthlyIncome: v })}
+        />
         <StatCard
-          label="Total spend"
+          label="Total expense"
           value={formatMoney(spent)}
           sub={`${monthTxns.length} transactions`}
           icon={<Wallet size={16} className="text-[var(--text-soft)]" />}
         />
         <StatCard
-          label="Budget remaining"
-          value={formatMoney(remaining)}
-          sub={`of ${formatMoney(budget)} budgeted`}
-          tone={remaining < 0 ? 'warn' : 'good'}
-          icon={<PiggyBank size={16} className="text-[var(--text-soft)]" />}
+          label="Difference"
+          value={formatMoney(difference)}
+          sub="income minus expense"
+          tone={difference < 0 ? 'warn' : 'good'}
+          icon={<Scale size={16} className="text-[var(--text-soft)]" />}
         />
         <StatCard
           label="6-month trend"
@@ -58,23 +64,17 @@ export function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card title="Category breakdown" className="lg:col-span-2">
-          <CategoryBreakdown data={spend} categories={categories} />
-        </Card>
-        <Card title="Financial health">
-          <FinancialHealth spent={spent} budget={budget} />
-        </Card>
-      </div>
+      <Card title="Category breakdown">
+        <CategoryBreakdown data={spend} categories={categories} />
+      </Card>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card title="Spending trend" className="lg:col-span-2">
-          <SpendTrend data={trend} />
-        </Card>
-        <Card title="Tips to optimize budget">
-          <BudgetTips tips={tips} />
-        </Card>
-      </div>
+      <Card title="Spending trend">
+        <SpendTrend data={trend} />
+      </Card>
+
+      <Card title="Income vs. expense (6 months)">
+        <IncomeExpenseTrend data={incomeExpenseTrend} />
+      </Card>
     </div>
   )
 }

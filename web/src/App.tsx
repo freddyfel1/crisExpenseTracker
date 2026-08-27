@@ -4,7 +4,7 @@ import { MobileNav } from './components/MobileNav'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Categories } from './pages/Categories'
-import { Budgets } from './pages/Budgets'
+import { BudgetPlanner } from './pages/BudgetPlanner'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
 
@@ -19,7 +19,7 @@ function App() {
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/transactions/:id" element={<Transactions />} />
             <Route path="/categories" element={<Categories />} />
-            <Route path="/budgets" element={<Budgets />} />
+            <Route path="/budget-planner" element={<BudgetPlanner />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

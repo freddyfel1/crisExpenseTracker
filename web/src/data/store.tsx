@@ -1,15 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  deleteBudgetLineItem as apiDeleteBudgetLineItem,
+  deleteBudgetSection as apiDeleteBudgetSection,
   deleteCategory as apiDeleteCategory,
   deleteTransaction as apiDeleteTransaction,
-  fetchBudgets,
+  fetchBudgetLineItems,
+  fetchBudgetSections,
   fetchCategories,
+  fetchProfile,
   fetchTransactions,
-  upsertBudget,
+  updateProfile,
+  upsertBudgetLineItem,
+  upsertBudgetSection,
   upsertCategory,
   upsertTransaction,
 } from './api'
-import type { Budget, Category, Transaction } from '../types'
+import type { BudgetLineItem, BudgetSection, Category, Profile, Transaction } from '../types'
 import { useSession } from '../hooks/useSession'
 
 // A thin wrapper over TanStack Query so every page can keep reading
@@ -30,9 +36,19 @@ export function useStore() {
     queryFn: fetchCategories,
     enabled: Boolean(userId),
   })
-  const budgetsQuery = useQuery({
-    queryKey: ['budgets', userId],
-    queryFn: fetchBudgets,
+  const profileQuery = useQuery({
+    queryKey: ['profile', userId],
+    queryFn: () => fetchProfile(userId!),
+    enabled: Boolean(userId),
+  })
+  const budgetSectionsQuery = useQuery({
+    queryKey: ['budgetSections', userId],
+    queryFn: fetchBudgetSections,
+    enabled: Boolean(userId),
+  })
+  const budgetLineItemsQuery = useQuery({
+    queryKey: ['budgetLineItems', userId],
+    queryFn: fetchBudgetLineItems,
     enabled: Boolean(userId),
   })
 
@@ -52,22 +68,40 @@ export function useStore() {
   })
   const removeCategory = useMutation({
     mutationFn: (id: string) => apiDeleteCategory(id),
+    onSuccess: () => invalidate('categories'),
+  })
+  const saveProfile = useMutation({
+    mutationFn: (patch: Partial<Profile>) => updateProfile(userId!, patch),
+    onSuccess: () => invalidate('profile'),
+  })
+  const saveBudgetSection = useMutation({
+    mutationFn: (s: Partial<BudgetSection> & { id?: string }) => upsertBudgetSection(userId!, s),
+    onSuccess: () => invalidate('budgetSections'),
+  })
+  const removeBudgetSection = useMutation({
+    mutationFn: (id: string) => apiDeleteBudgetSection(id),
     onSuccess: () => {
-      invalidate('categories')
-      invalidate('budgets')
+      invalidate('budgetSections')
+      invalidate('budgetLineItems')
     },
   })
-  const saveBudget = useMutation({
-    mutationFn: ({ categoryId, monthlyLimit }: { categoryId: string; monthlyLimit: number }) =>
-      upsertBudget(userId!, categoryId, monthlyLimit),
-    onSuccess: () => invalidate('budgets'),
+  const saveBudgetLineItem = useMutation({
+    mutationFn: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) =>
+      upsertBudgetLineItem(userId!, item),
+    onSuccess: () => invalidate('budgetLineItems'),
+  })
+  const removeBudgetLineItem = useMutation({
+    mutationFn: (id: string) => apiDeleteBudgetLineItem(id),
+    onSuccess: () => invalidate('budgetLineItems'),
   })
 
   return {
     transactions: transactionsQuery.data ?? [],
     categories: categoriesQuery.data ?? [],
-    budgets: budgetsQuery.data ?? ([] as Budget[]),
-    isLoading: transactionsQuery.isLoading || categoriesQuery.isLoading || budgetsQuery.isLoading,
+    profile: profileQuery.data,
+    budgetSections: budgetSectionsQuery.data ?? ([] as BudgetSection[]),
+    budgetLineItems: budgetLineItemsQuery.data ?? ([] as BudgetLineItem[]),
+    isLoading: transactionsQuery.isLoading || categoriesQuery.isLoading,
 
     addTransaction: (t: Transaction) => saveTransaction.mutate(t),
     updateTransaction: (id: string, patch: Partial<Transaction>) => saveTransaction.mutate({ id, ...patch }),
@@ -80,6 +114,12 @@ export function useStore() {
     },
     deleteCategory: (id: string) => removeCategory.mutate(id),
 
-    setBudget: (categoryId: string, monthlyLimit: number) => saveBudget.mutate({ categoryId, monthlyLimit }),
+    updateProfile: (patch: Partial<Profile>) => saveProfile.mutate(patch),
+
+    addBudgetSection: (s: Partial<BudgetSection>) => saveBudgetSection.mutate(s),
+    deleteBudgetSection: (id: string) => removeBudgetSection.mutate(id),
+    saveBudgetLineItem: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) =>
+      saveBudgetLineItem.mutate(item),
+    deleteBudgetLineItem: (id: string) => removeBudgetLineItem.mutate(id),
   }
 }

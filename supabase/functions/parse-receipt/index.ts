@@ -9,7 +9,16 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405)
   }
@@ -105,7 +114,10 @@ Return ONLY a JSON object with this exact shape, no other text, no markdown fenc
 })
 
 function json(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+  })
 }
 
 function base64Encode(bytes: Uint8Array): string {

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { Budget, Category, Profile, Transaction } from '../types'
+import type { BudgetLineItem, BudgetSection, Category, Profile, Transaction } from '../types'
 
 type TransactionRow = {
   id: string
@@ -67,15 +67,6 @@ export async function fetchCategories(): Promise<Category[]> {
   return data as Category[]
 }
 
-export async function fetchBudgets(): Promise<Budget[]> {
-  const { data, error } = await supabase.from('budgets').select('category_id, monthly_limit')
-  if (error) throw error
-  return (data as { category_id: string; monthly_limit: number }[]).map((b) => ({
-    categoryId: b.category_id,
-    monthlyLimit: Number(b.monthly_limit),
-  }))
-}
-
 export async function fetchProfile(userId: string): Promise<Profile> {
   const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
   if (error) throw error
@@ -86,6 +77,8 @@ export async function fetchProfile(userId: string): Promise<Profile> {
     notifyBudgetAlerts: data.notify_budget_alerts,
     notifyWeeklySummary: data.notify_weekly_summary,
     notifyReceiptSync: data.notify_receipt_sync,
+    monthlyIncome: Number(data.monthly_income),
+    monthlySavings: Number(data.monthly_savings),
   }
 }
 
@@ -98,8 +91,78 @@ export async function updateProfile(userId: string, patch: Partial<Profile>) {
       ...(patch.notifyBudgetAlerts !== undefined && { notify_budget_alerts: patch.notifyBudgetAlerts }),
       ...(patch.notifyWeeklySummary !== undefined && { notify_weekly_summary: patch.notifyWeeklySummary }),
       ...(patch.notifyReceiptSync !== undefined && { notify_receipt_sync: patch.notifyReceiptSync }),
+      ...(patch.monthlyIncome !== undefined && { monthly_income: patch.monthlyIncome }),
+      ...(patch.monthlySavings !== undefined && { monthly_savings: patch.monthlySavings }),
     })
     .eq('id', userId)
+  if (error) throw error
+}
+
+export async function fetchBudgetSections(): Promise<BudgetSection[]> {
+  const { data, error } = await supabase.from('budget_sections').select('*').order('sort_order')
+  if (error) throw error
+  return (data as { id: string; name: string; sort_order: number }[]).map((s) => ({
+    id: s.id,
+    name: s.name,
+    sortOrder: s.sort_order,
+  }))
+}
+
+export async function upsertBudgetSection(userId: string, s: Partial<BudgetSection> & { id?: string }) {
+  const { error } = await supabase
+    .from('budget_sections')
+    .upsert({ id: s.id, user_id: userId, name: s.name, sort_order: s.sortOrder ?? 0 })
+  if (error) throw error
+}
+
+export async function deleteBudgetSection(id: string) {
+  const { error } = await supabase.from('budget_sections').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchBudgetLineItems(): Promise<BudgetLineItem[]> {
+  const { data, error } = await supabase.from('budget_line_items').select('*').order('sort_order')
+  if (error) throw error
+  return (
+    data as {
+      id: string
+      section_id: string
+      name: string
+      monthly_amount: number
+      misc_info: string | null
+      remarks: string | null
+      sort_order: number
+    }[]
+  ).map((i) => ({
+    id: i.id,
+    sectionId: i.section_id,
+    name: i.name,
+    monthlyAmount: Number(i.monthly_amount),
+    miscInfo: i.misc_info,
+    remarks: i.remarks,
+    sortOrder: i.sort_order,
+  }))
+}
+
+export async function upsertBudgetLineItem(
+  userId: string,
+  item: Partial<BudgetLineItem> & { id?: string; sectionId: string },
+) {
+  const { error } = await supabase.from('budget_line_items').upsert({
+    id: item.id,
+    user_id: userId,
+    section_id: item.sectionId,
+    name: item.name,
+    monthly_amount: item.monthlyAmount ?? 0,
+    misc_info: item.miscInfo ?? null,
+    remarks: item.remarks ?? null,
+    sort_order: item.sortOrder ?? 0,
+  })
+  if (error) throw error
+}
+
+export async function deleteBudgetLineItem(id: string) {
+  const { error } = await supabase.from('budget_line_items').delete().eq('id', id)
   if (error) throw error
 }
 

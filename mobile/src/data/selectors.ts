@@ -1,4 +1,4 @@
-import type { Budget, Transaction } from '../types'
+import type { Transaction } from '../types'
 
 export const monthKey = (iso: string): string => iso.slice(0, 7)
 export const currentMonthKey = (): string => new Date().toISOString().slice(0, 7)
@@ -8,9 +8,6 @@ export const transactionsForMonth = (transactions: Transaction[], month: string)
 
 export const totalSpend = (transactions: Transaction[]): number =>
   transactions.reduce((sum, t) => sum + t.amount, 0)
-
-export const totalBudget = (budgets: Budget[]): number =>
-  budgets.reduce((sum, b) => sum + b.monthlyLimit, 0)
 
 export interface CategorySpend {
   categoryId: string | null
