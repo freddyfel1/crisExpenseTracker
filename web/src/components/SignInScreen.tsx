@@ -5,15 +5,30 @@ import { supabase } from '../lib/supabase'
 export function SignInScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in')
+  const [mode, setMode] = useState<'sign-in' | 'sign-up' | 'forgot-password'>('sign-in')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmNotice, setConfirmNotice] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
+
+    if (mode === 'forgot-password') {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      })
+      setLoading(false)
+      if (resetError) {
+        setError(resetError.message)
+        return
+      }
+      setResetSent(true)
+      return
+    }
+
     const { data, error: authError } =
       mode === 'sign-in'
         ? await supabase.auth.signInWithPassword({ email, password })
@@ -39,6 +54,10 @@ export function SignInScreen() {
         <p className="text-center text-[13px] text-[var(--text)]">
           Check your email to confirm your account, then sign in.
         </p>
+      ) : resetSent ? (
+        <p className="text-center text-[13px] text-[var(--text)]">
+          Check your email for a link to reset your password.
+        </p>
       ) : (
         <form onSubmit={submit} className="space-y-3">
           <input
@@ -50,29 +69,50 @@ export function SignInScreen() {
             onChange={(e) => setEmail(e.target.value)}
             className="input"
           />
-          <input
-            type="password"
-            required
-            autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input"
-          />
+          {mode !== 'forgot-password' && (
+            <input
+              type="password"
+              required
+              autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input"
+            />
+          )}
+          {mode === 'sign-in' && (
+            <button
+              type="button"
+              onClick={() => setMode('forgot-password')}
+              className="block text-right text-[12px] text-[var(--text-soft)]"
+            >
+              Forgot password?
+            </button>
+          )}
           {error && <p className="text-[13px] text-[var(--warn)]">{error}</p>}
           <button
             type="submit"
             disabled={loading}
             className="w-full rounded-lg bg-[var(--primary)] py-2.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-60"
           >
-            {loading ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
+            {loading
+              ? 'Please wait…'
+              : mode === 'sign-in'
+                ? 'Sign in'
+                : mode === 'sign-up'
+                  ? 'Create account'
+                  : 'Send reset link'}
           </button>
           <button
             type="button"
-            onClick={() => setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}
+            onClick={() => setMode(mode === 'sign-up' ? 'sign-in' : mode === 'forgot-password' ? 'sign-in' : 'sign-up')}
             className="w-full text-center text-[12.5px] text-[var(--text-soft)]"
           >
-            {mode === 'sign-in' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+            {mode === 'sign-in'
+              ? "Don't have an account? Sign up"
+              : mode === 'sign-up'
+                ? 'Already have an account? Sign in'
+                : 'Back to sign in'}
           </button>
         </form>
       )}

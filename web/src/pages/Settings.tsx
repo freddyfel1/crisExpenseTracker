@@ -11,7 +11,7 @@ export function Settings() {
   const { session } = useSession()
   const userId = session?.user.id
   const queryClient = useQueryClient()
-  const { transactions, categories, budgets } = useStore()
+  const { transactions, categories, budgetSections, budgetLineItems } = useStore()
 
   const profileQuery = useQuery({
     queryKey: ['profile', userId],
@@ -30,7 +30,7 @@ export function Settings() {
   const profile = profileQuery.data
 
   const exportBackup = () => {
-    const blob = new Blob([JSON.stringify({ transactions, categories, budgets, profile }, null, 2)], {
+    const blob = new Blob([JSON.stringify({ transactions, categories, budgetSections, budgetLineItems, profile }, null, 2)], {
       type: 'application/json',
     })
     const url = URL.createObjectURL(blob)
