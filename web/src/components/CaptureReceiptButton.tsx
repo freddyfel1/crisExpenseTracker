@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Camera } from 'lucide-react'
 import { useSession } from '../hooks/useSession'
 import { parseReceipt, uploadReceiptPhoto, upsertTransaction } from '../data/api'
+import { compressImage } from '../utils/compressImage'
 
 export function CaptureReceiptButton() {
   const { session } = useSession()
@@ -18,7 +19,8 @@ export function CaptureReceiptButton() {
     const id = crypto.randomUUID()
     setStage('uploading')
     try {
-      const path = await uploadReceiptPhoto(userId, file)
+      const compressed = await compressImage(file)
+      const path = await uploadReceiptPhoto(userId, compressed)
       await upsertTransaction(userId, {
         id,
         merchant: 'New receipt',
@@ -45,9 +47,10 @@ export function CaptureReceiptButton() {
             receiptImagePath: path,
           })
         }
-      } catch {
+      } catch (err) {
         // Auto-extraction is best-effort — the blank transaction we already saved
         // is still there for the user to fill in by hand.
+        console.error('parse-receipt failed:', err)
       }
 
       queryClient.invalidateQueries({ queryKey: ['transactions', userId] })

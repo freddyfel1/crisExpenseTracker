@@ -6,6 +6,7 @@
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { encodeBase64 } from 'jsr:@std/encoding@1/base64'
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
 
@@ -52,7 +53,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const arrayBuffer = await imageBlob.arrayBuffer()
-  const base64Image = base64Encode(new Uint8Array(arrayBuffer))
+  const base64Image = encodeBase64(new Uint8Array(arrayBuffer))
   const mediaType = imageBlob.type || 'image/jpeg'
 
   const categoryList = (categories ?? []).map((c) => `- ${c.id}: ${c.name}`).join('\n')
@@ -118,13 +119,4 @@ function json(body: unknown, status: number): Response {
     status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders },
   })
-}
-
-function base64Encode(bytes: Uint8Array): string {
-  let binary = ''
-  const chunkSize = 0x8000
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-  }
-  return btoa(binary)
 }

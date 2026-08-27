@@ -191,10 +191,10 @@ export async function getReceiptSignedUrl(path: string): Promise<string | null> 
   return data.signedUrl
 }
 
-export async function uploadReceiptPhoto(userId: string, file: File): Promise<string> {
+export async function uploadReceiptPhoto(userId: string, blob: Blob): Promise<string> {
   const path = `${userId}/${Date.now()}.jpg`
-  const { error } = await supabase.storage.from('receipts').upload(path, file, {
-    contentType: file.type || 'image/jpeg',
+  const { error } = await supabase.storage.from('receipts').upload(path, blob, {
+    contentType: blob.type || 'image/jpeg',
   })
   if (error) throw error
   return path
