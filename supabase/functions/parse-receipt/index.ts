@@ -97,6 +97,7 @@ Return ONLY a JSON object with this exact shape, no other text, no markdown fenc
 
   if (!claudeRes.ok) {
     const errText = await claudeRes.text()
+    console.error('Claude API error', claudeRes.status, errText)
     return json({ error: `Claude API error: ${errText}` }, 502)
   }
 
@@ -104,12 +105,16 @@ Return ONLY a JSON object with this exact shape, no other text, no markdown fenc
   const textBlock = result.content?.find((b: { type: string }) => b.type === 'text')
   const jsonMatch = textBlock?.text?.match(/\{[\s\S]*\}/)
 
-  if (!jsonMatch) return json({ error: 'Could not parse a response from Claude' }, 502)
+  if (!jsonMatch) {
+    console.error('No JSON found in Claude response', JSON.stringify(result))
+    return json({ error: 'Could not parse a response from Claude' }, 502)
+  }
 
   try {
     const parsed = JSON.parse(jsonMatch[0])
     return json(parsed, 200)
   } catch {
+    console.error('Claude returned malformed JSON', jsonMatch[0])
     return json({ error: 'Claude returned malformed JSON' }, 502)
   }
 })
