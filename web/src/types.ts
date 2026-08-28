@@ -29,6 +29,7 @@ export interface Profile {
   notifyWeeklySummary: boolean
   notifyReceiptSync: boolean
   monthlyIncome: number
+  otherIncome: number
   monthlySavings: number
 }
 

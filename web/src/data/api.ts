@@ -94,6 +94,7 @@ export async function fetchProfile(userId: string): Promise<Profile> {
     notifyWeeklySummary: data.notify_weekly_summary,
     notifyReceiptSync: data.notify_receipt_sync,
     monthlyIncome: Number(data.monthly_income),
+    otherIncome: Number(data.other_income),
     monthlySavings: Number(data.monthly_savings),
   }
 }
@@ -108,6 +109,7 @@ export async function updateProfile(userId: string, patch: Partial<Profile>) {
       ...(patch.notifyWeeklySummary !== undefined && { notify_weekly_summary: patch.notifyWeeklySummary }),
       ...(patch.notifyReceiptSync !== undefined && { notify_receipt_sync: patch.notifyReceiptSync }),
       ...(patch.monthlyIncome !== undefined && { monthly_income: patch.monthlyIncome }),
+      ...(patch.otherIncome !== undefined && { other_income: patch.otherIncome }),
       ...(patch.monthlySavings !== undefined && { monthly_savings: patch.monthlySavings }),
     })
     .eq('id', userId)

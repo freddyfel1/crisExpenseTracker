@@ -1,4 +1,4 @@
-import { TrendingUp, Wallet, Scale, Landmark } from 'lucide-react'
+import { TrendingUp, Wallet, Scale, Landmark, Coins, PiggyBank } from 'lucide-react'
 import { useStore } from '../data/store'
 import { usePeriod } from '../data/period'
 import { spendByCategory, spendTrend, totalSpend, transactionsForMonth } from '../data/selectors'
@@ -18,7 +18,8 @@ export function Dashboard() {
   const monthTxns = transactionsForMonth(transactions, month)
   const spend = spendByCategory(monthTxns)
   const spent = totalSpend(monthTxns)
-  const income = profile?.monthlyIncome ?? 0
+  const otherIncome = profile?.otherIncome ?? 0
+  const income = (profile?.monthlyIncome ?? 0) + otherIncome
   const difference = income - spent
   const trend = spendTrend(transactions, 6)
   const incomeExpenseTrend = trend.map((m) => ({ label: m.label, income, expense: m.total }))
@@ -38,10 +39,23 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <EditableStatCard
           label="Income"
-          value={income}
+          value={profile?.monthlyIncome ?? 0}
           sub="tap to edit"
           icon={<Landmark size={16} className="text-[var(--text-soft)]" />}
           onSave={(v) => updateProfile({ monthlyIncome: v })}
+        />
+        <EditableStatCard
+          label="Other income"
+          value={otherIncome}
+          sub="side income, etc. — tap to edit"
+          icon={<Coins size={16} className="text-[var(--text-soft)]" />}
+          onSave={(v) => updateProfile({ otherIncome: v })}
+        />
+        <StatCard
+          label="Total income"
+          value={formatMoney(income)}
+          sub="income + other income"
+          icon={<PiggyBank size={16} className="text-[var(--text-soft)]" />}
         />
         <StatCard
           label="Total expense"

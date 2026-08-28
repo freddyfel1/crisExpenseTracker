@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { GripVertical, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { formatMoney } from '../utils/format'
 import { Card } from '../components/Card'
@@ -29,6 +29,26 @@ export function BudgetPlanner() {
     const list = itemsBySection.get(item.sectionId) ?? []
     list.push(item)
     itemsBySection.set(item.sectionId, list)
+  }
+
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+
+  const moveSection = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return
+    const ids = sections.map((s) => s.id)
+    const from = ids.indexOf(sourceId)
+    const to = ids.indexOf(targetId)
+    if (from === -1 || to === -1) return
+    const reordered = [...ids]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    reordered.forEach((id, index) => {
+      const section = sections.find((s) => s.id === id)
+      if (section && section.sortOrder !== index) {
+        addBudgetSection({ id: section.id, name: section.name, sortOrder: index })
+      }
+    })
   }
 
   return (
@@ -70,6 +90,19 @@ export function BudgetPlanner() {
             if (window.confirm(`Delete "${section.name}" and all its line items? This cannot be undone.`)) {
               deleteBudgetSection(section.id)
             }
+          }}
+          isDragging={draggingId === section.id}
+          isDragOver={dragOverId === section.id && draggingId !== null && draggingId !== section.id}
+          onHandleDragStart={() => setDraggingId(section.id)}
+          onCardDragEnter={() => draggingId && setDragOverId(section.id)}
+          onCardDragEnd={() => {
+            setDraggingId(null)
+            setDragOverId(null)
+          }}
+          onCardDrop={() => {
+            if (draggingId) moveSection(draggingId, section.id)
+            setDraggingId(null)
+            setDragOverId(null)
           }}
         />
       ))}
@@ -148,6 +181,12 @@ function SectionCard({
   onSaveItem,
   onRenameSection,
   onDeleteSection,
+  isDragging,
+  isDragOver,
+  onHandleDragStart,
+  onCardDragEnter,
+  onCardDragEnd,
+  onCardDrop,
 }: {
   section: BudgetSection
   items: BudgetLineItem[]
@@ -156,38 +195,101 @@ function SectionCard({
   onSaveItem: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) => void
   onRenameSection: (name: string) => void
   onDeleteSection: () => void
+  isDragging: boolean
+  isDragOver: boolean
+  onHandleDragStart: () => void
+  onCardDragEnter: () => void
+  onCardDragEnd: () => void
+  onCardDrop: () => void
 }) {
   const total = items.reduce((sum, i) => sum + i.monthlyAmount, 0)
 
   return (
-    <Card>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <input
-          defaultValue={section.name}
-          onBlur={(e) => e.target.value.trim() && onRenameSection(e.target.value.trim())}
-          className="flex-1 bg-transparent text-[14px] font-semibold uppercase tracking-wide text-[var(--ink)] outline-none focus:border-b focus:border-[var(--border)]"
-        />
-        <span className="font-mono text-[13px] text-[var(--text-soft)]">{formatMoney(total)}/mo</span>
-        <button onClick={onDeleteSection} className="text-[var(--text-soft)] hover:text-[var(--warn)]">
-          <Trash2 size={15} />
+    <div
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnter={onCardDragEnter}
+      onDrop={(e) => {
+        e.preventDefault()
+        onCardDrop()
+      }}
+      className={`rounded-xl transition-opacity ${isDragging ? 'opacity-40' : ''} ${
+        isDragOver ? 'ring-2 ring-[var(--primary)]' : ''
+      }`}
+    >
+      <Card>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex flex-1 items-center gap-2">
+            <span
+              draggable
+              onDragStart={onHandleDragStart}
+              onDragEnd={onCardDragEnd}
+              className="cursor-grab text-[var(--text-soft)] hover:text-[var(--ink)] active:cursor-grabbing"
+              title="Drag to reorder section"
+            >
+              <GripVertical size={15} />
+            </span>
+            <input
+              defaultValue={section.name}
+              onBlur={(e) => e.target.value.trim() && onRenameSection(e.target.value.trim())}
+              className="flex-1 bg-transparent text-[14px] font-semibold uppercase tracking-wide text-[var(--ink)] outline-none focus:border-b focus:border-[var(--border)]"
+            />
+          </div>
+          <span className="font-mono text-[13px] text-[var(--text-soft)]">{formatMoney(total)}/mo</span>
+          <button onClick={onDeleteSection} className="text-[var(--text-soft)] hover:text-[var(--warn)]">
+            <Trash2 size={15} />
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {items.map((item) => (
+            <LineItemRow key={item.id} item={item} onSave={onSaveItem} onDelete={() => onDeleteItem(item.id)} />
+          ))}
+          {items.length === 0 && <p className="text-[12.5px] text-[var(--text-soft)]">No line items yet.</p>}
+        </div>
+
+        {items.length > 0 && (
+          <div className="mt-2 grid grid-cols-[1.4fr_0.7fr_0.7fr_1fr_1fr_auto] items-center gap-2 border-t border-[var(--border)] p-2">
+            <p className="text-[13px] font-semibold text-[var(--ink)]">Total</p>
+            <p className="font-mono text-[13px] font-semibold text-[var(--ink)]">{formatMoney(total)}</p>
+            <p className="text-[12.5px] text-[var(--text-soft)]">{formatMoney(total * 12)}/yr</p>
+          </div>
+        )}
+
+        <button
+          onClick={onAddItem}
+          className="mt-3 flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--primary)] hover:underline"
+        >
+          <Plus size={14} /> Add line item
         </button>
-      </div>
-
-      <div className="space-y-2">
-        {items.map((item) => (
-          <LineItemRow key={item.id} item={item} onSave={onSaveItem} onDelete={() => onDeleteItem(item.id)} />
-        ))}
-        {items.length === 0 && <p className="text-[12.5px] text-[var(--text-soft)]">No line items yet.</p>}
-      </div>
-
-      <button
-        onClick={onAddItem}
-        className="mt-3 flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--primary)] hover:underline"
-      >
-        <Plus size={14} /> Add line item
-      </button>
-    </Card>
+      </Card>
+    </div>
   )
+}
+
+const LINE_ITEM_COLUMNS = ['Name', 'Monthly', 'Misc info', 'Remarks'] as const
+
+/** On Enter: move across the remaining fields in the row first; at the last field, drop to the next row's first field. */
+function focusNextCell(e: React.KeyboardEvent<HTMLInputElement>) {
+  if (e.key !== 'Enter') return
+  e.preventDefault()
+  const row = e.currentTarget.closest<HTMLElement>('[data-line-item-row]')
+  const container = row?.parentElement
+  if (!row || !container) return
+
+  const colIndex = LINE_ITEM_COLUMNS.indexOf(e.currentTarget.placeholder as (typeof LINE_ITEM_COLUMNS)[number])
+
+  let targetRow: HTMLElement | undefined = row
+  let targetCol = LINE_ITEM_COLUMNS[colIndex + 1]
+  if (!targetCol) {
+    const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-line-item-row]'))
+    targetRow = rows[rows.indexOf(row) + 1]
+    targetCol = LINE_ITEM_COLUMNS[0]
+  }
+  if (!targetRow) return
+
+  const next = targetRow.querySelector<HTMLInputElement>(`input[placeholder="${targetCol}"]`)
+  next?.focus()
+  next?.select()
 }
 
 function LineItemRow({
@@ -200,19 +302,32 @@ function LineItemRow({
   onDelete: () => void
 }) {
   return (
-    <div className="grid grid-cols-[1.4fr_0.7fr_0.7fr_1fr_1fr_auto] items-center gap-2 rounded-lg border border-[var(--border-soft)] p-2">
+    <div
+      data-line-item-row
+      className="grid grid-cols-[1.4fr_0.7fr_0.7fr_1fr_1fr_auto] items-center gap-2 rounded-lg border border-[var(--border-soft)] p-2"
+    >
       <input
         defaultValue={item.name}
         placeholder="Name"
         onBlur={(e) => onSave({ ...item, name: e.target.value })}
+        onKeyDown={focusNextCell}
         className="input py-1 text-[13px]"
       />
       <input
-        defaultValue={item.monthlyAmount}
+        defaultValue={formatMoney(item.monthlyAmount)}
         type="text"
         inputMode="decimal"
         placeholder="Monthly"
-        onBlur={(e) => onSave({ ...item, monthlyAmount: Number(e.target.value) || 0 })}
+        onFocus={(e) => {
+          e.target.value = item.monthlyAmount === 0 ? '' : String(item.monthlyAmount)
+          e.target.select()
+        }}
+        onBlur={(e) => {
+          const parsed = Number(e.target.value.replace(/[^0-9.-]/g, '')) || 0
+          onSave({ ...item, monthlyAmount: parsed })
+          e.target.value = formatMoney(parsed)
+        }}
+        onKeyDown={focusNextCell}
         className="input py-1 text-[13px] font-mono"
       />
       <p className="text-[12.5px] text-[var(--text-soft)]" title="Yearly (monthly x 12)">
@@ -222,12 +337,14 @@ function LineItemRow({
         defaultValue={item.miscInfo ?? ''}
         placeholder="Misc info"
         onBlur={(e) => onSave({ ...item, miscInfo: e.target.value || null })}
+        onKeyDown={focusNextCell}
         className="input py-1 text-[13px]"
       />
       <input
         defaultValue={item.remarks ?? ''}
         placeholder="Remarks"
         onBlur={(e) => onSave({ ...item, remarks: e.target.value || null })}
+        onKeyDown={focusNextCell}
         className="input py-1 text-[13px]"
       />
       <button onClick={onDelete} className="text-[var(--text-soft)] hover:text-[var(--warn)]">
