@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowUpDown, Plus, Search } from 'lucide-react'
 import { useStore } from '../data/store'
 import { resolveCategory } from '../utils/resolveCategory'
-import { formatDate, formatMoney } from '../utils/format'
+import { currentMonthKey, formatDate, formatMoney, monthKey, monthKeyLabel } from '../utils/format'
 import { ReceiptThumb } from '../components/ReceiptThumb'
 import { CategoryIcon } from '../components/CategoryIcon'
 import { TransactionDrawer } from '../components/TransactionDrawer'
@@ -12,18 +12,39 @@ import { CaptureReceiptButton } from '../components/CaptureReceiptButton'
 type SortKey = 'date' | 'amount' | 'merchant'
 
 export function Transactions() {
-  const { transactions, categories } = useStore()
+  const { transactions, categories, profile } = useStore()
   const navigate = useNavigate()
   const { id } = useParams()
 
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [monthFilter, setMonthFilter] = useState('all')
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const months = useMemo(() => {
+    const keys = transactions.map((t) => monthKey(t.date))
+    const earliest = keys.length ? keys.reduce((a, b) => (a < b ? a : b)) : currentMonthKey()
+    const latest = keys.length ? keys.reduce((a, b) => (a > b ? a : b), currentMonthKey()) : currentMonthKey()
+
+    const result: string[] = []
+    let [y, m] = latest.split('-').map(Number)
+    const [endY, endM] = earliest.split('-').map(Number)
+    while (y > endY || (y === endY && m >= endM)) {
+      result.push(`${y}-${String(m).padStart(2, '0')}`)
+      m -= 1
+      if (m === 0) {
+        m = 12
+        y -= 1
+      }
+    }
+    return result
+  }, [transactions])
 
   const filtered = useMemo(() => {
     let rows = transactions
     if (categoryFilter !== 'all') rows = rows.filter((t) => t.categoryId === categoryFilter)
+    if (monthFilter !== 'all') rows = rows.filter((t) => monthKey(t.date) === monthFilter)
     if (query.trim()) {
       const q = query.toLowerCase()
       rows = rows.filter(
@@ -41,7 +62,10 @@ export function Transactions() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return sorted
-  }, [transactions, categoryFilter, query, sortKey, sortDir])
+  }, [transactions, categoryFilter, monthFilter, query, sortKey, sortDir])
+
+  const monthIncome = (profile?.monthlyIncome ?? 0) + (profile?.otherIncome ?? 0)
+  const monthExpense = useMemo(() => filtered.reduce((sum, t) => sum + t.amount, 0), [filtered])
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -79,6 +103,18 @@ export function Transactions() {
             className="w-full bg-transparent text-[13px] outline-none placeholder:text-[var(--text-soft)]"
           />
         </div>
+        <select
+          value={monthFilter}
+          onChange={(e) => setMonthFilter(e.target.value)}
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)]"
+        >
+          <option value="all">All months</option>
+          {months.map((m) => (
+            <option key={m} value={m}>
+              {monthKeyLabel(m)}
+            </option>
+          ))}
+        </select>
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
@@ -148,6 +184,38 @@ export function Transactions() {
               </tr>
             )}
           </tbody>
+          {monthFilter !== 'all' && (
+            <tfoot>
+              <tr className="border-t border-[var(--border)] bg-[var(--paper)] text-[13px]">
+                <td colSpan={3} className="px-4 py-3 font-medium text-[var(--text-soft)]">
+                  Income
+                </td>
+                <td className="px-4 py-3 text-right font-mono font-medium text-[var(--ink)]">
+                  {formatMoney(monthIncome)}
+                </td>
+              </tr>
+              <tr className="border-t border-[var(--border-soft)] bg-[var(--paper)] text-[13px]">
+                <td colSpan={3} className="px-4 py-3 font-medium text-[var(--text-soft)]">
+                  Total expense
+                </td>
+                <td className="px-4 py-3 text-right font-mono font-medium text-[var(--ink)]">
+                  {formatMoney(monthExpense)}
+                </td>
+              </tr>
+              <tr className="border-t border-[var(--border-soft)] bg-[var(--paper)] text-[13px]">
+                <td colSpan={3} className="px-4 py-3 font-medium text-[var(--text-soft)]">
+                  Balance
+                </td>
+                <td
+                  className={`px-4 py-3 text-right font-mono font-medium ${
+                    monthIncome - monthExpense < 0 ? 'text-[var(--warn)]' : 'text-[var(--primary)]'
+                  }`}
+                >
+                  {formatMoney(monthIncome - monthExpense)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 

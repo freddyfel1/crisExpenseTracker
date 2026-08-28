@@ -5,6 +5,7 @@ import { Camera } from 'lucide-react'
 import { useSession } from '../hooks/useSession'
 import { parseReceipt, uploadReceiptPhoto, upsertTransaction } from '../data/api'
 import { compressImage } from '../utils/compressImage'
+import { todayKey } from '../utils/format'
 
 export function CaptureReceiptButton() {
   const { session } = useSession()
@@ -25,7 +26,7 @@ export function CaptureReceiptButton() {
         id,
         merchant: 'New receipt',
         amount: 0,
-        date: new Date().toISOString(),
+        date: todayKey(),
         categoryId: null,
         tags: [],
         receiptImagePath: path,
@@ -39,7 +40,7 @@ export function CaptureReceiptButton() {
             id,
             merchant: parsed.merchant || 'New receipt',
             amount: parsed.amount ?? 0,
-            date: parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString(),
+            date: parsed.date ? parsed.date.slice(0, 10) : todayKey(),
             categoryId: parsed.categoryId ?? null,
             tax: parsed.tax ?? null,
             tip: parsed.tip ?? null,

@@ -4,6 +4,7 @@ import { useStore } from '../data/store'
 import type { Transaction } from '../types'
 import { ReceiptThumb } from './ReceiptThumb'
 import { resolveCategory } from '../utils/resolveCategory'
+import { todayKey } from '../utils/format'
 
 interface Props {
   id: string
@@ -13,7 +14,7 @@ interface Props {
 function emptyTransaction(): Transaction {
   return {
     id: crypto.randomUUID(),
-    date: new Date().toISOString(),
+    date: todayKey(),
     merchant: '',
     categoryId: null,
     amount: 0,
@@ -91,7 +92,7 @@ export function TransactionDrawer({ id, onClose }: Props) {
               <input
                 type="date"
                 value={draft.date.slice(0, 10)}
-                onChange={(e) => setDraft({ ...draft, date: new Date(e.target.value).toISOString() })}
+                onChange={(e) => setDraft({ ...draft, date: e.target.value })}
                 className="input"
               />
             </Field>
