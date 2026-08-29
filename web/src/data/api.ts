@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { BudgetLineItem, BudgetSection, Category, Profile, Transaction } from '../types'
+import { currentMonthKey } from '../utils/format'
 
 type TransactionRow = {
   id: string
@@ -119,21 +120,69 @@ export async function updateProfile(userId: string, patch: Partial<Profile>) {
 export async function fetchBudgetSections(): Promise<BudgetSection[]> {
   const { data, error } = await supabase.from('budget_sections').select('*').order('sort_order')
   if (error) throw error
-  return (data as { id: string; name: string; sort_order: number }[]).map((s) => ({
+  return (data as { id: string; name: string; sort_order: number; month_key: string }[]).map((s) => ({
     id: s.id,
     name: s.name,
     sortOrder: s.sort_order,
+    monthKey: s.month_key,
   }))
 }
 
 export async function upsertBudgetSection(userId: string, s: Partial<BudgetSection> & { id?: string }) {
   const { data, error } = await supabase
     .from('budget_sections')
-    .upsert({ id: s.id, user_id: userId, name: s.name, sort_order: s.sortOrder ?? 0 })
+    .upsert({ id: s.id, user_id: userId, name: s.name, sort_order: s.sortOrder ?? 0, month_key: s.monthKey })
     .select()
     .single()
   if (error) throw error
-  return { id: data.id, name: data.name, sortOrder: data.sort_order } as BudgetSection
+  return { id: data.id, name: data.name, sortOrder: data.sort_order, monthKey: data.month_key } as BudgetSection
+}
+
+/** Copies a month's sections + line items forward/backward into a month that has no data yet. */
+export async function duplicateBudgetMonth(
+  userId: string,
+  fromSections: BudgetSection[],
+  fromItemsBySection: Map<string, BudgetLineItem[]>,
+  toMonthKey: string,
+) {
+  if (fromSections.length === 0) return
+
+  const { data: newSections, error: sectionsError } = await supabase
+    .from('budget_sections')
+    .insert(
+      fromSections.map((s) => ({
+        user_id: userId,
+        name: s.name,
+        sort_order: s.sortOrder,
+        month_key: toMonthKey,
+      })),
+    )
+    .select()
+  if (sectionsError) throw sectionsError
+
+  const idMap = new Map<string, string>()
+  fromSections.forEach((s, i) => idMap.set(s.id, newSections[i].id))
+
+  // Only the month the user is actually editing keeps real amounts — every
+  // duplicated month (past or future) starts blank so it's not just a copy
+  // of whatever the source month happened to have.
+  const clearAmounts = toMonthKey !== currentMonthKey()
+
+  const newItems = fromSections.flatMap((s) =>
+    (fromItemsBySection.get(s.id) ?? []).map((item) => ({
+      user_id: userId,
+      section_id: idMap.get(s.id)!,
+      name: item.name,
+      monthly_amount: clearAmounts ? 0 : item.monthlyAmount,
+      misc_info: item.miscInfo,
+      remarks: item.remarks,
+      sort_order: item.sortOrder,
+    })),
+  )
+  if (newItems.length > 0) {
+    const { error: itemsError } = await supabase.from('budget_line_items').insert(newItems)
+    if (itemsError) throw itemsError
+  }
 }
 
 export async function deleteBudgetSection(id: string) {

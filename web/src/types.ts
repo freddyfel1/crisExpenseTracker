@@ -37,6 +37,7 @@ export interface BudgetSection {
   id: string
   name: string
   sortOrder: number
+  monthKey: string // YYYY-MM
 }
 
 export interface BudgetLineItem {

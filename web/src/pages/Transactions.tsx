@@ -1,15 +1,31 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowUpDown, Plus, Search } from 'lucide-react'
+import { ArrowUpDown, Plus, Search, PiggyBank, Wallet, Scale } from 'lucide-react'
 import { useStore } from '../data/store'
 import { resolveCategory } from '../utils/resolveCategory'
-import { currentMonthKey, formatDate, formatMoney, monthKey, monthKeyLabel } from '../utils/format'
+import { formatDate, formatMoney, monthKey } from '../utils/format'
 import { ReceiptThumb } from '../components/ReceiptThumb'
 import { CategoryIcon } from '../components/CategoryIcon'
 import { TransactionDrawer } from '../components/TransactionDrawer'
 import { CaptureReceiptButton } from '../components/CaptureReceiptButton'
+import { StatCard } from '../components/StatCard'
 
 type SortKey = 'date' | 'amount' | 'merchant'
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 
 export function Transactions() {
   const { transactions, categories, profile } = useStore()
@@ -18,33 +34,22 @@ export function Transactions() {
 
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [yearFilter, setYearFilter] = useState('all')
   const [monthFilter, setMonthFilter] = useState('all')
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  const months = useMemo(() => {
-    const keys = transactions.map((t) => monthKey(t.date))
-    const earliest = keys.length ? keys.reduce((a, b) => (a < b ? a : b)) : currentMonthKey()
-    const latest = keys.length ? keys.reduce((a, b) => (a > b ? a : b), currentMonthKey()) : currentMonthKey()
-
-    const result: string[] = []
-    let [y, m] = latest.split('-').map(Number)
-    const [endY, endM] = earliest.split('-').map(Number)
-    while (y > endY || (y === endY && m >= endM)) {
-      result.push(`${y}-${String(m).padStart(2, '0')}`)
-      m -= 1
-      if (m === 0) {
-        m = 12
-        y -= 1
-      }
-    }
-    return result
+  const years = useMemo(() => {
+    const set = new Set(transactions.map((t) => monthKey(t.date).slice(0, 4)))
+    set.add(String(new Date().getFullYear()))
+    return Array.from(set).sort((a, b) => b.localeCompare(a))
   }, [transactions])
 
   const filtered = useMemo(() => {
     let rows = transactions
     if (categoryFilter !== 'all') rows = rows.filter((t) => t.categoryId === categoryFilter)
-    if (monthFilter !== 'all') rows = rows.filter((t) => monthKey(t.date) === monthFilter)
+    if (yearFilter !== 'all') rows = rows.filter((t) => monthKey(t.date).slice(0, 4) === yearFilter)
+    if (monthFilter !== 'all') rows = rows.filter((t) => monthKey(t.date).slice(5, 7) === monthFilter)
     if (query.trim()) {
       const q = query.toLowerCase()
       rows = rows.filter(
@@ -62,7 +67,7 @@ export function Transactions() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return sorted
-  }, [transactions, categoryFilter, monthFilter, query, sortKey, sortDir])
+  }, [transactions, categoryFilter, yearFilter, monthFilter, query, sortKey, sortDir])
 
   const monthIncome = (profile?.monthlyIncome ?? 0) + (profile?.otherIncome ?? 0)
   const monthExpense = useMemo(() => filtered.reduce((sum, t) => sum + t.amount, 0), [filtered])
@@ -104,14 +109,26 @@ export function Transactions() {
           />
         </div>
         <select
+          value={yearFilter}
+          onChange={(e) => setYearFilter(e.target.value)}
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)]"
+        >
+          <option value="all">All years</option>
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+        <select
           value={monthFilter}
           onChange={(e) => setMonthFilter(e.target.value)}
           className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)]"
         >
           <option value="all">All months</option>
-          {months.map((m) => (
-            <option key={m} value={m}>
-              {monthKeyLabel(m)}
+          {MONTH_NAMES.map((name, i) => (
+            <option key={name} value={String(i + 1).padStart(2, '0')}>
+              {name}
             </option>
           ))}
         </select>
@@ -127,6 +144,28 @@ export function Transactions() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Total income"
+          value={formatMoney(monthIncome)}
+          sub="income + other income"
+          icon={<PiggyBank size={16} className="text-[var(--text-soft)]" />}
+        />
+        <StatCard
+          label="Total expense"
+          value={formatMoney(monthExpense)}
+          sub={`${filtered.length} transactions`}
+          icon={<Wallet size={16} className="text-[var(--text-soft)]" />}
+        />
+        <StatCard
+          label="Balance"
+          value={formatMoney(monthIncome - monthExpense)}
+          sub="income minus expense"
+          tone={monthIncome - monthExpense < 0 ? 'warn' : 'good'}
+          icon={<Scale size={16} className="text-[var(--text-soft)]" />}
+        />
       </div>
 
       <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
@@ -184,38 +223,6 @@ export function Transactions() {
               </tr>
             )}
           </tbody>
-          {monthFilter !== 'all' && (
-            <tfoot>
-              <tr className="border-t border-[var(--border)] bg-[var(--paper)] text-[13px]">
-                <td colSpan={3} className="px-4 py-3 font-medium text-[var(--text-soft)]">
-                  Income
-                </td>
-                <td className="px-4 py-3 text-right font-mono font-medium text-[var(--ink)]">
-                  {formatMoney(monthIncome)}
-                </td>
-              </tr>
-              <tr className="border-t border-[var(--border-soft)] bg-[var(--paper)] text-[13px]">
-                <td colSpan={3} className="px-4 py-3 font-medium text-[var(--text-soft)]">
-                  Total expense
-                </td>
-                <td className="px-4 py-3 text-right font-mono font-medium text-[var(--ink)]">
-                  {formatMoney(monthExpense)}
-                </td>
-              </tr>
-              <tr className="border-t border-[var(--border-soft)] bg-[var(--paper)] text-[13px]">
-                <td colSpan={3} className="px-4 py-3 font-medium text-[var(--text-soft)]">
-                  Balance
-                </td>
-                <td
-                  className={`px-4 py-3 text-right font-mono font-medium ${
-                    monthIncome - monthExpense < 0 ? 'text-[var(--warn)]' : 'text-[var(--primary)]'
-                  }`}
-                >
-                  {formatMoney(monthIncome - monthExpense)}
-                </td>
-              </tr>
-            </tfoot>
-          )}
         </table>
       </div>
 

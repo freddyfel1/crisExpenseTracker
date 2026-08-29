@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { GripVertical, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { GripVertical, Plus, Search, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
+import { usePeriod } from '../data/period'
 import { formatMoney } from '../utils/format'
 import { Card } from '../components/Card'
+import { MonthPicker } from '../components/MonthPicker'
 import type { BudgetLineItem, BudgetSection } from '../types'
 
 export function BudgetPlanner() {
@@ -10,33 +12,67 @@ export function BudgetPlanner() {
     profile,
     budgetSections,
     budgetLineItems,
-    updateProfile,
     addBudgetSection,
     deleteBudgetSection,
     saveBudgetLineItem,
     deleteBudgetLineItem,
+    duplicateBudgetMonth,
+    isDuplicatingBudgetMonth,
   } = useStore()
+  const { month } = usePeriod()
 
-  const income = profile?.monthlyIncome ?? 0
-  const savings = profile?.monthlySavings ?? 0
-  const expenses = budgetLineItems.reduce((sum, i) => sum + i.monthlyAmount, 0)
+  const [query, setQuery] = useState('')
+
+  const monthSections = useMemo(
+    () => budgetSections.filter((s) => s.monthKey === month).sort((a, b) => a.sortOrder - b.sortOrder),
+    [budgetSections, month],
+  )
+  const itemsBySection = useMemo(() => {
+    const map = new Map<string, BudgetLineItem[]>()
+    for (const item of budgetLineItems) {
+      const list = map.get(item.sectionId) ?? []
+      list.push(item)
+      map.set(item.sectionId, list)
+    }
+    return map
+  }, [budgetLineItems])
+
+  // The first time a month with no plan yet is opened, carry the nearest
+  // month's sections/line items forward so the user edits amounts rather
+  // than rebuilding the whole spreadsheet from scratch.
+  const duplicateRequestedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (monthSections.length > 0 || duplicateRequestedFor.current === month) return
+    const monthsWithData = Array.from(new Set(budgetSections.map((s) => s.monthKey))).sort()
+    const sourceMonth = [...monthsWithData].reverse().find((m) => m < month) ?? monthsWithData.find((m) => m > month)
+    if (!sourceMonth) return
+    duplicateRequestedFor.current = month
+    const sourceSections = budgetSections.filter((s) => s.monthKey === sourceMonth)
+    duplicateBudgetMonth(sourceSections, itemsBySection, month)
+  }, [month, budgetSections, monthSections.length, itemsBySection, duplicateBudgetMonth])
+
+  const income = (profile?.monthlyIncome ?? 0) + (profile?.otherIncome ?? 0)
+  const savingsSection = monthSections.find((s) => s.name.toLowerCase().includes('saving'))
+  const savings = (itemsBySection.get(savingsSection?.id ?? '') ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0)
+  const expenses = monthSections
+    .filter((s) => s.id !== savingsSection?.id)
+    .reduce((sum, s) => sum + (itemsBySection.get(s.id) ?? []).reduce((a, i) => a + i.monthlyAmount, 0), 0)
   const difference = income - expenses
   const balance = difference - savings
 
-  const sections = [...budgetSections].sort((a, b) => a.sortOrder - b.sortOrder)
-  const itemsBySection = new Map<string, BudgetLineItem[]>()
-  for (const item of budgetLineItems) {
-    const list = itemsBySection.get(item.sectionId) ?? []
-    list.push(item)
-    itemsBySection.set(item.sectionId, list)
-  }
+  const q = query.trim().toLowerCase()
+  const matchesQuery = (item: BudgetLineItem) =>
+    !q ||
+    item.name.toLowerCase().includes(q) ||
+    (item.miscInfo ?? '').toLowerCase().includes(q) ||
+    (item.remarks ?? '').toLowerCase().includes(q)
 
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   const moveSection = (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return
-    const ids = sections.map((s) => s.id)
+    const ids = monthSections.map((s) => s.id)
     const from = ids.indexOf(sourceId)
     const to = ids.indexOf(targetId)
     if (from === -1 || to === -1) return
@@ -44,48 +80,77 @@ export function BudgetPlanner() {
     const [moved] = reordered.splice(from, 1)
     reordered.splice(to, 0, moved)
     reordered.forEach((id, index) => {
-      const section = sections.find((s) => s.id === id)
+      const section = monthSections.find((s) => s.id === id)
       if (section && section.sortOrder !== index) {
-        addBudgetSection({ id: section.id, name: section.name, sortOrder: index })
+        addBudgetSection({ id: section.id, name: section.name, sortOrder: index, monthKey: section.monthKey })
       }
     })
   }
 
+  const visibleSections = monthSections
+    .map((section) => {
+      const items = (itemsBySection.get(section.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder)
+      const visibleItems = q ? items.filter(matchesQuery) : items
+      return { section, items, visibleItems }
+    })
+    .filter(({ visibleItems }) => !q || visibleItems.length > 0)
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="font-display text-[26px] text-[var(--ink)]">Budget Planner</h1>
-        <p className="text-[13px] text-[var(--text-soft)]">
-          A planned monthly budget, organized into sections and line items — like a spreadsheet.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-[26px] text-[var(--ink)]">Budget Planner</h1>
+          <p className="text-[13px] text-[var(--text-soft)]">
+            A planned monthly budget, organized into sections and line items — like a spreadsheet.
+          </p>
+        </div>
+        <MonthPicker />
+      </div>
+
+      <div className="flex min-w-[220px] items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+        <Search size={15} className="text-[var(--text-soft)]" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search line items, misc info, remarks..."
+          className="w-full bg-transparent text-[13px] outline-none placeholder:text-[var(--text-soft)]"
+        />
       </div>
 
       <Card title="Summary">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-          <SummaryStat label="Income" value={income} onSave={(v) => updateProfile({ monthlyIncome: v })} editable />
+          <SummaryStat label="Total income" value={income} />
           <SummaryStat label="Expenses" value={expenses} />
           <SummaryStat label="Difference" value={difference} tone={difference < 0 ? 'warn' : 'good'} />
-          <SummaryStat label="Savings" value={savings} onSave={(v) => updateProfile({ monthlySavings: v })} editable />
+          <SummaryStat label="Savings" value={savings} />
           <SummaryStat label="Balance" value={balance} tone={balance < 0 ? 'warn' : 'good'} />
         </div>
       </Card>
 
-      {sections.map((section) => (
+      {isDuplicatingBudgetMonth && (
+        <p className="text-[12.5px] text-[var(--text-soft)]">Copying last month's plan into this month…</p>
+      )}
+
+      {visibleSections.map(({ section, visibleItems, items }) => (
         <SectionCard
           key={section.id}
           section={section}
-          items={(itemsBySection.get(section.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder)}
+          items={visibleItems}
+          isEmptySection={items.length === 0}
+          total={items.reduce((sum, i) => sum + i.monthlyAmount, 0)}
           onAddItem={() =>
             saveBudgetLineItem({
               sectionId: section.id,
               name: 'New item',
               monthlyAmount: 0,
-              sortOrder: (itemsBySection.get(section.id) ?? []).length,
+              sortOrder: items.length,
             })
           }
           onDeleteItem={deleteBudgetLineItem}
           onSaveItem={saveBudgetLineItem}
-          onRenameSection={(name) => addBudgetSection({ id: section.id, name, sortOrder: section.sortOrder })}
+          onRenameSection={(name) =>
+            addBudgetSection({ id: section.id, name, sortOrder: section.sortOrder, monthKey: section.monthKey })
+          }
           onDeleteSection={() => {
             if (window.confirm(`Delete "${section.name}" and all its line items? This cannot be undone.`)) {
               deleteBudgetSection(section.id)
@@ -107,8 +172,12 @@ export function BudgetPlanner() {
         />
       ))}
 
+      {q && visibleSections.length === 0 && (
+        <p className="text-[13px] text-[var(--text-soft)]">No line items match your search.</p>
+      )}
+
       <button
-        onClick={() => addBudgetSection({ name: 'New section', sortOrder: sections.length })}
+        onClick={() => addBudgetSection({ name: 'New section', sortOrder: monthSections.length, monthKey: month })}
         className="flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-soft)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
       >
         <Plus size={15} /> Add section
@@ -176,6 +245,8 @@ function SummaryStat({
 function SectionCard({
   section,
   items,
+  isEmptySection,
+  total,
   onAddItem,
   onDeleteItem,
   onSaveItem,
@@ -190,6 +261,8 @@ function SectionCard({
 }: {
   section: BudgetSection
   items: BudgetLineItem[]
+  isEmptySection: boolean
+  total: number
   onAddItem: () => void
   onDeleteItem: (id: string) => void
   onSaveItem: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) => void
@@ -202,8 +275,6 @@ function SectionCard({
   onCardDragEnd: () => void
   onCardDrop: () => void
 }) {
-  const total = items.reduce((sum, i) => sum + i.monthlyAmount, 0)
-
   return (
     <div
       onDragOver={(e) => e.preventDefault()}
@@ -244,7 +315,7 @@ function SectionCard({
           {items.map((item) => (
             <LineItemRow key={item.id} item={item} onSave={onSaveItem} onDelete={() => onDeleteItem(item.id)} />
           ))}
-          {items.length === 0 && <p className="text-[12.5px] text-[var(--text-soft)]">No line items yet.</p>}
+          {isEmptySection && <p className="text-[12.5px] text-[var(--text-soft)]">No line items yet.</p>}
         </div>
 
         {items.length > 0 && (

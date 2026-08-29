@@ -4,6 +4,7 @@ import {
   deleteBudgetSection as apiDeleteBudgetSection,
   deleteCategory as apiDeleteCategory,
   deleteTransaction as apiDeleteTransaction,
+  duplicateBudgetMonth as apiDuplicateBudgetMonth,
   fetchBudgetLineItems,
   fetchBudgetSections,
   fetchCategories,
@@ -94,6 +95,17 @@ export function useStore() {
     mutationFn: (id: string) => apiDeleteBudgetLineItem(id),
     onSuccess: () => invalidate('budgetLineItems'),
   })
+  const duplicateBudgetMonth = useMutation({
+    mutationFn: ({ fromSections, fromItemsBySection, toMonthKey }: {
+      fromSections: BudgetSection[]
+      fromItemsBySection: Map<string, BudgetLineItem[]>
+      toMonthKey: string
+    }) => apiDuplicateBudgetMonth(userId!, fromSections, fromItemsBySection, toMonthKey),
+    onSuccess: () => {
+      invalidate('budgetSections')
+      invalidate('budgetLineItems')
+    },
+  })
 
   return {
     transactions: transactionsQuery.data ?? [],
@@ -121,5 +133,11 @@ export function useStore() {
     saveBudgetLineItem: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) =>
       saveBudgetLineItem.mutate(item),
     deleteBudgetLineItem: (id: string) => removeBudgetLineItem.mutate(id),
+    duplicateBudgetMonth: (
+      fromSections: BudgetSection[],
+      fromItemsBySection: Map<string, BudgetLineItem[]>,
+      toMonthKey: string,
+    ) => duplicateBudgetMonth.mutate({ fromSections, fromItemsBySection, toMonthKey }),
+    isDuplicatingBudgetMonth: duplicateBudgetMonth.isPending,
   }
 }
