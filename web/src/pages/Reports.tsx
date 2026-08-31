@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Legend, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useStore } from '../data/store'
 import { formatMoney, monthKey } from '../utils/format'
 import { resolveCategory } from '../utils/resolveCategory'
@@ -10,17 +10,26 @@ import { CategoryIcon } from '../components/CategoryIcon'
 const UNCATEGORIZED_KEY = 'uncategorized'
 const categoryKey = (id: string | null) => id ?? UNCATEGORIZED_KEY
 
-function lastNMonths(n: number): { key: string; label: string }[] {
-  const now = new Date()
-  const months = []
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: d.toLocaleDateString('en-US', { month: 'short' }),
-    })
-  }
-  return months
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
+function monthsOfYear(year: string): { key: string; label: string }[] {
+  return MONTH_NAMES.map((name, i) => ({
+    key: `${year}-${String(i + 1).padStart(2, '0')}`,
+    label: name.slice(0, 3),
+  }))
 }
 
 function downloadCsv(rows: string[][], filename: string) {
@@ -36,10 +45,30 @@ function downloadCsv(rows: string[][], filename: string) {
 
 export function Reports() {
   const { transactions, categories } = useStore()
-  const months = lastNMonths(6)
+  const currentYear = String(new Date().getFullYear())
+
+  const years = useMemo(() => {
+    const set = new Set(transactions.map((t) => monthKey(t.date).slice(0, 4)))
+    set.add(currentYear)
+    return Array.from(set).sort((a, b) => b.localeCompare(a))
+  }, [transactions, currentYear])
+
+  const [yearFilter, setYearFilter] = useState(currentYear)
+  const [monthFilter, setMonthFilter] = useState('all')
+
+  const months = monthsOfYear(yearFilter)
+
+  // Scoped to the selected year, and the selected month if one is picked —
+  // drives the summary sections (top categories/merchants, CSV export).
+  const periodTransactions = useMemo(() => {
+    let rows = transactions.filter((t) => monthKey(t.date).slice(0, 4) === yearFilter)
+    if (monthFilter !== 'all') rows = rows.filter((t) => monthKey(t.date).slice(5, 7) === monthFilter)
+    return rows
+  }, [transactions, yearFilter, monthFilter])
+
   const topCategories = useMemo(() => {
     const totals = new Map<string, number>()
-    for (const t of transactions) {
+    for (const t of periodTransactions) {
       const key = categoryKey(t.categoryId)
       totals.set(key, (totals.get(key) ?? 0) + t.amount)
     }
@@ -47,10 +76,12 @@ export function Reports() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([id]) => id)
-  }, [transactions])
+  }, [periodTransactions])
 
   const byIdCat = (key: string) => resolveCategory(categories, key === UNCATEGORIZED_KEY ? null : key)
 
+  // Always plots all 12 months of the selected year, regardless of the month
+  // filter, so the chart stays a full-year trend even when a month is picked.
   const chartData = months.map(({ key, label }) => {
     const row: Record<string, number | string> = { label }
     for (const catKey of topCategories) {
@@ -64,19 +95,22 @@ export function Reports() {
 
   const topMerchants = useMemo(() => {
     const totals = new Map<string, { total: number; count: number }>()
-    for (const t of transactions) {
+    for (const t of periodTransactions) {
       const entry = totals.get(t.merchant) ?? { total: 0, count: 0 }
       entry.total += t.amount
       entry.count += 1
       totals.set(t.merchant, entry)
     }
     return [...totals.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 8)
-  }, [transactions])
+  }, [periodTransactions])
+
+  const periodLabel =
+    monthFilter === 'all' ? yearFilter : `${MONTH_NAMES[Number(monthFilter) - 1]} ${yearFilter}`
 
   const exportCsv = () => {
     const rows = [
       ['Date', 'Merchant', 'Category', 'Amount', 'Payment Method', 'Notes'],
-      ...transactions.map((t) => [
+      ...periodTransactions.map((t) => [
         t.date.slice(0, 10),
         t.merchant,
         resolveCategory(categories, t.categoryId).name,
@@ -85,7 +119,8 @@ export function Reports() {
         t.notes ?? '',
       ]),
     ]
-    downloadCsv(rows, `crisexpensetracker_transactions_${new Date().toISOString().slice(0, 10)}.csv`)
+    const suffix = monthFilter === 'all' ? yearFilter : `${yearFilter}-${monthFilter}`
+    downloadCsv(rows, `crisexpensetracker_transactions_${suffix}.csv`)
   }
 
   return (
@@ -95,15 +130,43 @@ export function Reports() {
           <h1 className="font-display text-[26px] text-[var(--ink)]">Reports</h1>
           <p className="text-[13px] text-[var(--text-soft)]">Category trends and top merchants</p>
         </div>
-        <button
-          onClick={exportCsv}
-          className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)]"
-        >
-          <Download size={15} /> Export CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={yearFilter}
+            onChange={(e) => {
+              setYearFilter(e.target.value)
+              setMonthFilter('all')
+            }}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)]"
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)]"
+          >
+            <option value="all">All months</option>
+            {MONTH_NAMES.map((name, i) => (
+              <option key={name} value={String(i + 1).padStart(2, '0')}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={exportCsv}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)]"
+          >
+            <Download size={15} /> Export CSV
+          </button>
+        </div>
       </div>
 
-      <Card title="Top categories, last 6 months">
+      <Card title={`Top categories, ${periodLabel}`}>
         <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
@@ -115,6 +178,16 @@ export function Reports() {
                 contentStyle={{ borderRadius: 8, border: '1px solid var(--border)', fontSize: 12 }}
               />
               <Legend formatter={(value: string) => byIdCat(value).name} wrapperStyle={{ fontSize: 12 }} />
+              {monthFilter !== 'all' && (
+                <ReferenceArea
+                  x1={months[Number(monthFilter) - 1].label}
+                  x2={months[Number(monthFilter) - 1].label}
+                  fill="var(--primary)"
+                  fillOpacity={0.1}
+                  stroke="var(--primary)"
+                  strokeOpacity={0.35}
+                />
+              )}
               {topCategories.map((catKey) => (
                 <Bar key={catKey} dataKey={catKey} stackId="a" fill={byIdCat(catKey).color} radius={[3, 3, 0, 0]} />
               ))}
@@ -123,7 +196,7 @@ export function Reports() {
         </div>
       </Card>
 
-      <Card title="Top merchants">
+      <Card title={`Top merchants, ${periodLabel}`}>
         <ul className="divide-y divide-[var(--border-soft)]">
           {topMerchants.map(([merchant, { total, count }]) => (
             <li key={merchant} className="flex items-center justify-between py-2.5 text-[13px]">
@@ -136,6 +209,11 @@ export function Reports() {
               <span className="font-mono font-medium text-[var(--ink)]">{formatMoney(total)}</span>
             </li>
           ))}
+          {topMerchants.length === 0 && (
+            <li className="py-6 text-center text-[13px] text-[var(--text-soft)]">
+              No transactions for {periodLabel}.
+            </li>
+          )}
         </ul>
       </Card>
 
