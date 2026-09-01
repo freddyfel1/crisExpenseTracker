@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { GripVertical, Plus, Search, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { usePeriod } from '../data/period'
+import { monthlyIncomeEntryForMonth } from '../data/selectors'
 import { formatMoney } from '../utils/format'
 import { Card } from '../components/Card'
 import { MonthPicker } from '../components/MonthPicker'
@@ -9,7 +10,7 @@ import type { BudgetLineItem, BudgetSection } from '../types'
 
 export function BudgetPlanner() {
   const {
-    profile,
+    monthlyIncomes,
     budgetSections,
     budgetLineItems,
     addBudgetSection,
@@ -51,7 +52,8 @@ export function BudgetPlanner() {
     duplicateBudgetMonth(sourceSections, itemsBySection, month)
   }, [month, budgetSections, monthSections.length, itemsBySection, duplicateBudgetMonth])
 
-  const income = (profile?.monthlyIncome ?? 0) + (profile?.otherIncome ?? 0)
+  const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(monthlyIncomes, month)
+  const income = monthlyIncome + otherIncome
   const savingsSection = monthSections.find((s) => s.name.toLowerCase().includes('saving'))
   const savings = (itemsBySection.get(savingsSection?.id ?? '') ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0)
   const expenses = monthSections

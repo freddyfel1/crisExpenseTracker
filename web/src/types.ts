@@ -28,9 +28,14 @@ export interface Profile {
   notifyBudgetAlerts: boolean
   notifyWeeklySummary: boolean
   notifyReceiptSync: boolean
+  monthlySavings: number
+}
+
+export interface MonthlyIncome {
+  id: string
+  monthKey: string // YYYY-MM
   monthlyIncome: number
   otherIncome: number
-  monthlySavings: number
 }
 
 export interface BudgetSection {

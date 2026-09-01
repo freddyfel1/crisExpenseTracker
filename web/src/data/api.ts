@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { BudgetLineItem, BudgetSection, Category, Profile, Transaction } from '../types'
+import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, Transaction } from '../types'
 import { currentMonthKey } from '../utils/format'
 
 type TransactionRow = {
@@ -94,8 +94,6 @@ export async function fetchProfile(userId: string): Promise<Profile> {
     notifyBudgetAlerts: data.notify_budget_alerts,
     notifyWeeklySummary: data.notify_weekly_summary,
     notifyReceiptSync: data.notify_receipt_sync,
-    monthlyIncome: Number(data.monthly_income),
-    otherIncome: Number(data.other_income),
     monthlySavings: Number(data.monthly_savings),
   }
 }
@@ -109,11 +107,38 @@ export async function updateProfile(userId: string, patch: Partial<Profile>) {
       ...(patch.notifyBudgetAlerts !== undefined && { notify_budget_alerts: patch.notifyBudgetAlerts }),
       ...(patch.notifyWeeklySummary !== undefined && { notify_weekly_summary: patch.notifyWeeklySummary }),
       ...(patch.notifyReceiptSync !== undefined && { notify_receipt_sync: patch.notifyReceiptSync }),
-      ...(patch.monthlyIncome !== undefined && { monthly_income: patch.monthlyIncome }),
-      ...(patch.otherIncome !== undefined && { other_income: patch.otherIncome }),
       ...(patch.monthlySavings !== undefined && { monthly_savings: patch.monthlySavings }),
     })
     .eq('id', userId)
+  if (error) throw error
+}
+
+export async function fetchMonthlyIncome(): Promise<MonthlyIncome[]> {
+  const { data, error } = await supabase.from('monthly_income').select('*').order('month_key')
+  if (error) throw error
+  return (
+    data as { id: string; month_key: string; monthly_income: number; other_income: number }[]
+  ).map((r) => ({
+    id: r.id,
+    monthKey: r.month_key,
+    monthlyIncome: Number(r.monthly_income),
+    otherIncome: Number(r.other_income),
+  }))
+}
+
+export async function upsertMonthlyIncome(
+  userId: string,
+  entry: { monthKey: string; monthlyIncome: number; otherIncome: number },
+) {
+  const { error } = await supabase.from('monthly_income').upsert(
+    {
+      user_id: userId,
+      month_key: entry.monthKey,
+      monthly_income: entry.monthlyIncome,
+      other_income: entry.otherIncome,
+    },
+    { onConflict: 'user_id,month_key' },
+  )
   if (error) throw error
 }
 

@@ -8,15 +8,17 @@ import {
   fetchBudgetLineItems,
   fetchBudgetSections,
   fetchCategories,
+  fetchMonthlyIncome,
   fetchProfile,
   fetchTransactions,
   updateProfile,
   upsertBudgetLineItem,
   upsertBudgetSection,
   upsertCategory,
+  upsertMonthlyIncome,
   upsertTransaction,
 } from './api'
-import type { BudgetLineItem, BudgetSection, Category, Profile, Transaction } from '../types'
+import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, Transaction } from '../types'
 import { useSession } from '../hooks/useSession'
 
 // A thin wrapper over TanStack Query so every page can keep reading
@@ -50,6 +52,11 @@ export function useStore() {
   const budgetLineItemsQuery = useQuery({
     queryKey: ['budgetLineItems', userId],
     queryFn: fetchBudgetLineItems,
+    enabled: Boolean(userId),
+  })
+  const monthlyIncomeQuery = useQuery({
+    queryKey: ['monthlyIncome', userId],
+    queryFn: fetchMonthlyIncome,
     enabled: Boolean(userId),
   })
 
@@ -95,6 +102,11 @@ export function useStore() {
     mutationFn: (id: string) => apiDeleteBudgetLineItem(id),
     onSuccess: () => invalidate('budgetLineItems'),
   })
+  const saveMonthlyIncome = useMutation({
+    mutationFn: (entry: { monthKey: string; monthlyIncome: number; otherIncome: number }) =>
+      upsertMonthlyIncome(userId!, entry),
+    onSuccess: () => invalidate('monthlyIncome'),
+  })
   const duplicateBudgetMonth = useMutation({
     mutationFn: ({ fromSections, fromItemsBySection, toMonthKey }: {
       fromSections: BudgetSection[]
@@ -113,6 +125,7 @@ export function useStore() {
     profile: profileQuery.data,
     budgetSections: budgetSectionsQuery.data ?? ([] as BudgetSection[]),
     budgetLineItems: budgetLineItemsQuery.data ?? ([] as BudgetLineItem[]),
+    monthlyIncomes: monthlyIncomeQuery.data ?? ([] as MonthlyIncome[]),
     isLoading: transactionsQuery.isLoading || categoriesQuery.isLoading,
 
     addTransaction: (t: Transaction) => saveTransaction.mutate(t),
@@ -127,6 +140,9 @@ export function useStore() {
     deleteCategory: (id: string) => removeCategory.mutate(id),
 
     updateProfile: (patch: Partial<Profile>) => saveProfile.mutate(patch),
+
+    saveMonthlyIncome: (entry: { monthKey: string; monthlyIncome: number; otherIncome: number }) =>
+      saveMonthlyIncome.mutate(entry),
 
     addBudgetSection: (s: Partial<BudgetSection>) => saveBudgetSection.mutate(s),
     deleteBudgetSection: (id: string) => removeBudgetSection.mutate(id),

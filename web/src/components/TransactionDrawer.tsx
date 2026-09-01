@@ -4,7 +4,7 @@ import { useStore } from '../data/store'
 import type { Transaction } from '../types'
 import { ReceiptThumb } from './ReceiptThumb'
 import { resolveCategory } from '../utils/resolveCategory'
-import { todayKey } from '../utils/format'
+import { formatMoney, todayKey } from '../utils/format'
 
 interface Props {
   id: string
@@ -98,10 +98,19 @@ export function TransactionDrawer({ id, onClose }: Props) {
             </Field>
             <Field label="Amount">
               <input
-                type="number"
-                step="0.01"
-                value={draft.amount}
-                onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) })}
+                key={draft.id}
+                defaultValue={formatMoney(draft.amount)}
+                type="text"
+                inputMode="decimal"
+                onFocus={(e) => {
+                  e.target.value = draft.amount === 0 ? '' : String(draft.amount)
+                  e.target.select()
+                }}
+                onBlur={(e) => {
+                  const parsed = Number(e.target.value.replace(/[^0-9.-]/g, '')) || 0
+                  setDraft({ ...draft, amount: parsed })
+                  e.target.value = formatMoney(parsed)
+                }}
                 className="input font-mono"
               />
             </Field>

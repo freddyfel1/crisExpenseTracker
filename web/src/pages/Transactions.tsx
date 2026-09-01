@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowUpDown, Plus, Search, PiggyBank, Wallet, Scale } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, Plus, Search, PiggyBank, Wallet, Scale } from 'lucide-react'
 import { useStore } from '../data/store'
+import { currentCalendarMonth, monthlyIncomeEntryForMonth, monthsUpTo, totalIncomeForMonths } from '../data/selectors'
 import { resolveCategory } from '../utils/resolveCategory'
-import { formatDate, formatMoney, monthKey } from '../utils/format'
+import { formatDate, formatMoney, monthKey, monthKeyLabel } from '../utils/format'
 import { ReceiptThumb } from '../components/ReceiptThumb'
 import { CategoryIcon } from '../components/CategoryIcon'
 import { TransactionDrawer } from '../components/TransactionDrawer'
 import { CaptureReceiptButton } from '../components/CaptureReceiptButton'
 import { StatCard } from '../components/StatCard'
+import type { MonthlyIncome } from '../types'
 
 type SortKey = 'date' | 'amount' | 'merchant'
 
@@ -28,7 +30,7 @@ const MONTH_NAMES = [
 ]
 
 export function Transactions() {
-  const { transactions, categories, profile } = useStore()
+  const { transactions, categories, monthlyIncomes, saveMonthlyIncome } = useStore()
   const navigate = useNavigate()
   const { id } = useParams()
 
@@ -39,17 +41,24 @@ export function Transactions() {
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  const currentYear = String(new Date().getFullYear())
+
   const years = useMemo(() => {
     const set = new Set(transactions.map((t) => monthKey(t.date).slice(0, 4)))
-    set.add(String(new Date().getFullYear()))
+    monthlyIncomes.forEach((e) => set.add(e.monthKey.slice(0, 4)))
+    set.add(currentYear)
     return Array.from(set).sort((a, b) => b.localeCompare(a))
-  }, [transactions])
+  }, [transactions, monthlyIncomes, currentYear])
 
-  const filtered = useMemo(() => {
+  // Category/search narrow both the table and the summary stats. Year/month
+  // narrow the table to an exact match, but drive the summary stats as a
+  // year-to-date cutoff instead: picking a year sums Jan through that
+  // year's selected month (or through the current real month when "All
+  // months" is picked); picking "All years" sums that same Jan-through-X
+  // range across every year with data.
+  const searchFiltered = useMemo(() => {
     let rows = transactions
     if (categoryFilter !== 'all') rows = rows.filter((t) => t.categoryId === categoryFilter)
-    if (yearFilter !== 'all') rows = rows.filter((t) => monthKey(t.date).slice(0, 4) === yearFilter)
-    if (monthFilter !== 'all') rows = rows.filter((t) => monthKey(t.date).slice(5, 7) === monthFilter)
     if (query.trim()) {
       const q = query.toLowerCase()
       rows = rows.filter(
@@ -59,6 +68,13 @@ export function Transactions() {
           t.tags.some((tag) => tag.toLowerCase().includes(q)),
       )
     }
+    return rows
+  }, [transactions, categoryFilter, query])
+
+  const filtered = useMemo(() => {
+    let rows = searchFiltered
+    if (yearFilter !== 'all') rows = rows.filter((t) => monthKey(t.date).slice(0, 4) === yearFilter)
+    if (monthFilter !== 'all') rows = rows.filter((t) => monthKey(t.date).slice(5, 7) === monthFilter)
     const sorted = [...rows].sort((a, b) => {
       let cmp = 0
       if (sortKey === 'date') cmp = a.date.localeCompare(b.date)
@@ -67,10 +83,30 @@ export function Transactions() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return sorted
-  }, [transactions, categoryFilter, yearFilter, monthFilter, query, sortKey, sortDir])
+  }, [searchFiltered, yearFilter, monthFilter, sortKey, sortDir])
 
-  const monthIncome = (profile?.monthlyIncome ?? 0) + (profile?.otherIncome ?? 0)
-  const monthExpense = useMemo(() => filtered.reduce((sum, t) => sum + t.amount, 0), [filtered])
+  // Cutoff month for the summary stats: the picked month, or the current
+  // real-world month when "All months" is selected.
+  const cutoffMonth = monthFilter === 'all' ? currentCalendarMonth() : Number(monthFilter)
+
+  // Months covered by the summary stats: Jan through cutoffMonth, for the
+  // selected year, or every year with data when "All years" is picked.
+  const statMonths = useMemo(() => {
+    const relevantYears = yearFilter === 'all' ? years : [yearFilter]
+    return relevantYears.flatMap((y) => monthsUpTo(y, cutoffMonth))
+  }, [yearFilter, years, cutoffMonth])
+
+  const totalIncome = useMemo(() => totalIncomeForMonths(monthlyIncomes, statMonths), [monthlyIncomes, statMonths])
+  const totalExpense = useMemo(() => {
+    const monthSet = new Set(statMonths)
+    return searchFiltered.filter((t) => monthSet.has(monthKey(t.date))).reduce((sum, t) => sum + t.amount, 0)
+  }, [searchFiltered, statMonths])
+  const balance = totalIncome - totalExpense
+
+  const periodLabel = useMemo(() => {
+    const cutoffLabel = MONTH_NAMES[cutoffMonth - 1].slice(0, 3)
+    return yearFilter === 'all' ? `Jan–${cutoffLabel}, all years` : `Jan–${cutoffLabel} ${yearFilter}`
+  }, [yearFilter, cutoffMonth])
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -147,23 +183,26 @@ export function Transactions() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Total income"
-          value={formatMoney(monthIncome)}
-          sub="income + other income"
-          icon={<PiggyBank size={16} className="text-[var(--text-soft)]" />}
+        <IncomeBreakdownCard
+          months={statMonths}
+          monthlyIncomes={monthlyIncomes}
+          total={totalIncome}
+          periodLabel={periodLabel}
+          onSave={(monthKeyToSave, monthlyIncomeVal, otherIncomeVal) =>
+            saveMonthlyIncome({ monthKey: monthKeyToSave, monthlyIncome: monthlyIncomeVal, otherIncome: otherIncomeVal })
+          }
         />
         <StatCard
           label="Total expense"
-          value={formatMoney(monthExpense)}
-          sub={`${filtered.length} transactions`}
+          value={formatMoney(totalExpense)}
+          sub={periodLabel}
           icon={<Wallet size={16} className="text-[var(--text-soft)]" />}
         />
         <StatCard
           label="Balance"
-          value={formatMoney(monthIncome - monthExpense)}
+          value={formatMoney(balance)}
           sub="income minus expense"
-          tone={monthIncome - monthExpense < 0 ? 'warn' : 'good'}
+          tone={balance < 0 ? 'warn' : 'good'}
           icon={<Scale size={16} className="text-[var(--text-soft)]" />}
         />
       </div>
@@ -227,6 +266,118 @@ export function Transactions() {
       </div>
 
       {id && <TransactionDrawer id={id} onClose={() => navigate('/transactions')} />}
+    </div>
+  )
+}
+
+function IncomeBreakdownCard({
+  months,
+  monthlyIncomes,
+  total,
+  periodLabel,
+  onSave,
+}: {
+  months: string[]
+  monthlyIncomes: MonthlyIncome[]
+  total: number
+  periodLabel: string
+  onSave: (monthKey: string, monthlyIncome: number, otherIncome: number) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <p className="text-[12px] uppercase tracking-wide text-[var(--text-soft)]">Total income</p>
+        <div className="flex items-center gap-2 text-[var(--text-soft)]">
+          <PiggyBank size={16} />
+          <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+      <p className="font-display mt-2 text-[30px] leading-none text-[var(--ink)]">{formatMoney(total)}</p>
+      <p className="mt-1.5 text-[12.5px] text-[var(--text-soft)]">
+        {expanded ? 'tap a month to edit' : periodLabel}
+      </p>
+      {expanded && (
+        <div className="mt-3 max-h-64 space-y-0.5 overflow-y-auto border-t border-[var(--border-soft)] pt-3">
+          {[...months].reverse().map((m) => (
+            <IncomeMonthRow
+              key={m}
+              monthKey={m}
+              entry={monthlyIncomes.find((e) => e.monthKey === m)}
+              monthlyIncomes={monthlyIncomes}
+              onSave={onSave}
+            />
+          ))}
+          {months.length === 0 && (
+            <p className="py-2 text-center text-[12.5px] text-[var(--text-soft)]">No months in range.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IncomeMonthRow({
+  monthKey: mKey,
+  entry,
+  monthlyIncomes,
+  onSave,
+}: {
+  monthKey: string
+  entry?: MonthlyIncome
+  monthlyIncomes: MonthlyIncome[]
+  onSave: (monthKey: string, monthlyIncome: number, otherIncome: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  // Falls back to the nearest month that has a figure when this month
+  // hasn't been touched yet, so the row matches the cumulative total above
+  // instead of looking like $0 income.
+  const { monthlyIncome: fallbackIncome, otherIncome: fallbackOther } = monthlyIncomeEntryForMonth(
+    monthlyIncomes,
+    mKey,
+  )
+  const total = fallbackIncome + fallbackOther
+  const [draft, setDraft] = useState(String(total))
+
+  const commit = () => {
+    const parsed = Number(draft)
+    if (!Number.isNaN(parsed)) onSave(mKey, parsed - fallbackOther, fallbackOther)
+    setEditing(false)
+  }
+
+  return (
+    <div className="flex items-center justify-between rounded-md px-1.5 py-1.5 text-[13px] hover:bg-[var(--paper)]">
+      <span className="text-[var(--text-soft)]">
+        {monthKeyLabel(mKey)}
+        {!entry && total > 0 && <span className="ml-1.5 text-[11px] italic opacity-70">est.</span>}
+      </span>
+      {editing ? (
+        <input
+          autoFocus
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+          className="w-24 rounded-md border border-[var(--border)] bg-[var(--paper)] px-2 py-0.5 text-right font-mono text-[13px] text-[var(--ink)]"
+        />
+      ) : (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setDraft(String(total))
+            setEditing(true)
+          }}
+          className="font-mono font-medium text-[var(--ink)] hover:underline"
+        >
+          {formatMoney(total)}
+        </button>
+      )}
     </div>
   )
 }
