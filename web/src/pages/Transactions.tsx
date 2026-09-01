@@ -2,7 +2,13 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowUpDown, ChevronDown, Plus, Search, PiggyBank, Wallet, Scale } from 'lucide-react'
 import { useStore } from '../data/store'
-import { currentCalendarMonth, monthlyIncomeEntryForMonth, monthsUpTo, totalIncomeForMonths } from '../data/selectors'
+import {
+  currentCalendarMonth,
+  incomeForMonth,
+  monthlyIncomeEntryForMonth,
+  monthsUpTo,
+  totalIncomeForMonths,
+} from '../data/selectors'
 import { resolveCategory } from '../utils/resolveCategory'
 import { formatDate, formatMoney, monthKey, monthKeyLabel } from '../utils/format'
 import { ReceiptThumb } from '../components/ReceiptThumb'
@@ -107,6 +113,17 @@ export function Transactions() {
     const cutoffLabel = MONTH_NAMES[cutoffMonth - 1].slice(0, 3)
     return yearFilter === 'all' ? `Jan–${cutoffLabel}, all years` : `Jan–${cutoffLabel} ${yearFilter}`
   }, [yearFilter, cutoffMonth])
+
+  // Single totals row for the table footer, summed across whatever rows are
+  // currently displayed — just that month's figures when a specific month is
+  // picked, or the combined total across every month shown when "All months"
+  // is picked.
+  const tableIncome = useMemo(() => {
+    const months = new Set(filtered.map((t) => monthKey(t.date)))
+    return Array.from(months).reduce((sum, m) => sum + incomeForMonth(monthlyIncomes, m), 0)
+  }, [filtered, monthlyIncomes])
+  const tableExpense = useMemo(() => filtered.reduce((sum, t) => sum + t.amount, 0), [filtered])
+  const tableBalance = tableIncome - tableExpense
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -262,6 +279,38 @@ export function Transactions() {
               </tr>
             )}
           </tbody>
+          {filtered.length > 0 && (
+            <tfoot>
+              <tr className="border-t border-[var(--border-soft)] bg-[var(--paper)] text-[12px] text-[var(--text-soft)]">
+                <td colSpan={3} className="px-4 py-2">
+                  Total income
+                </td>
+                <td className="px-4 py-2 text-right font-mono font-medium text-[var(--good)]">
+                  {formatMoney(tableIncome)}
+                </td>
+              </tr>
+              <tr className="border-t border-[var(--border-soft)] bg-[var(--paper)] text-[12px] text-[var(--text-soft)]">
+                <td colSpan={3} className="px-4 py-2">
+                  Total expense
+                </td>
+                <td className="px-4 py-2 text-right font-mono font-medium text-[var(--ink)]">
+                  {formatMoney(tableExpense)}
+                </td>
+              </tr>
+              <tr className="border-t border-[var(--border)] bg-[var(--paper)] text-[13px]">
+                <td colSpan={3} className="px-4 py-2.5 font-medium text-[var(--ink)]">
+                  Balance
+                </td>
+                <td
+                  className={`px-4 py-2.5 text-right font-mono font-semibold ${
+                    tableBalance < 0 ? 'text-[var(--warn)]' : 'text-[var(--good)]'
+                  }`}
+                >
+                  {formatMoney(tableBalance)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 
