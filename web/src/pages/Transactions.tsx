@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowUpDown, ChevronDown, Plus, Search, PiggyBank, Wallet, Scale } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, Plus, Search, PiggyBank, Wallet, Scale, Landmark } from 'lucide-react'
 import { useStore } from '../data/store'
 import {
   currentCalendarMonth,
@@ -42,8 +42,10 @@ export function Transactions() {
 
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [yearFilter, setYearFilter] = useState('all')
-  const [monthFilter, setMonthFilter] = useState('all')
+  // Defaults to the current month/year so the page opens already scoped to
+  // "now" instead of every transaction ever recorded.
+  const [yearFilter, setYearFilter] = useState(() => String(new Date().getFullYear()))
+  const [monthFilter, setMonthFilter] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'))
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -101,6 +103,21 @@ export function Transactions() {
     const relevantYears = yearFilter === 'all' ? years : [yearFilter]
     return relevantYears.flatMap((y) => monthsUpTo(y, cutoffMonth))
   }, [yearFilter, years, cutoffMonth])
+
+  // Single-month figures shown above the year-to-date stats: whichever month
+  // is picked in the filters, or the current real-world month when "All
+  // months" is selected (mirrors the cutoffMonth default below).
+  const singleMonthKey = useMemo(() => {
+    const y = yearFilter === 'all' ? currentYear : yearFilter
+    const m = monthFilter === 'all' ? currentCalendarMonth() : Number(monthFilter)
+    return `${y}-${String(m).padStart(2, '0')}`
+  }, [yearFilter, monthFilter, currentYear])
+  const monthIncome = useMemo(() => incomeForMonth(monthlyIncomes, singleMonthKey), [monthlyIncomes, singleMonthKey])
+  const monthExpense = useMemo(
+    () => searchFiltered.filter((t) => monthKey(t.date) === singleMonthKey).reduce((sum, t) => sum + t.amount, 0),
+    [searchFiltered, singleMonthKey],
+  )
+  const monthBalance = monthIncome - monthExpense
 
   const totalIncome = useMemo(() => totalIncomeForMonths(monthlyIncomes, statMonths), [monthlyIncomes, statMonths])
   const totalExpense = useMemo(() => {
@@ -197,6 +214,28 @@ export function Transactions() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Income"
+          value={formatMoney(monthIncome)}
+          sub={monthKeyLabel(singleMonthKey)}
+          icon={<Landmark size={16} className="text-[var(--text-soft)]" />}
+        />
+        <StatCard
+          label="Expense"
+          value={formatMoney(monthExpense)}
+          sub={monthKeyLabel(singleMonthKey)}
+          icon={<Wallet size={16} className="text-[var(--text-soft)]" />}
+        />
+        <StatCard
+          label="Balance"
+          value={formatMoney(monthBalance)}
+          sub="income minus expense"
+          tone={monthBalance < 0 ? 'warn' : 'good'}
+          icon={<Scale size={16} className="text-[var(--text-soft)]" />}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
