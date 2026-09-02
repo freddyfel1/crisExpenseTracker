@@ -10,11 +10,17 @@ import {
   FileSpreadsheet,
   PiggyBank,
   HelpCircle,
+  Landmark,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/transactions', label: 'Transactions', icon: Receipt },
+  {
+    to: '/transactions',
+    label: 'Transactions',
+    icon: Receipt,
+    children: [{ to: '/transactions/connect-bank', label: 'Connect to bank', icon: Landmark }],
+  },
   { to: '/categories', label: 'Categories', icon: Tags },
   { to: '/budget-planner', label: 'Budget Planner', icon: FileSpreadsheet },
   { to: '/savings-goals', label: 'Savings Goals', icon: PiggyBank },
@@ -84,22 +90,43 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] transition-colors ${
-                isActive
-                  ? 'bg-[var(--primary-soft)] text-[var(--primary-ink)] font-medium'
-                  : 'text-[var(--text)] hover:bg-[var(--paper)]'
-              }`
-            }
-          >
-            <Icon size={17} strokeWidth={2} />
-            {label}
-          </NavLink>
+        {NAV_ITEMS.map(({ to, label, icon: Icon, end, children }) => (
+          <div key={to}>
+            <NavLink
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] transition-colors ${
+                  isActive
+                    ? 'bg-[var(--primary-soft)] text-[var(--primary-ink)] font-medium'
+                    : 'text-[var(--text)] hover:bg-[var(--paper)]'
+                }`
+              }
+            >
+              <Icon size={17} strokeWidth={2} />
+              {label}
+            </NavLink>
+            {children && (
+              <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-[var(--border)] pl-3">
+                {children.map(({ to: childTo, label: childLabel, icon: ChildIcon }) => (
+                  <NavLink
+                    key={childTo}
+                    to={childTo}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] transition-colors ${
+                        isActive
+                          ? 'bg-[var(--primary-soft)] text-[var(--primary-ink)] font-medium'
+                          : 'text-[var(--text-soft)] hover:bg-[var(--paper)]'
+                      }`
+                    }
+                  >
+                    <ChildIcon size={15} strokeWidth={2} />
+                    {childLabel}
+                  </NavLink>
+                ))}
+              </div>
+            )}
+          </div>
         ))}
       </nav>
 

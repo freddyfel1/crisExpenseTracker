@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { MobileNav } from './components/MobileNav'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
+import { ConnectBank } from './pages/ConnectBank'
 import { Categories } from './pages/Categories'
 import { BudgetPlanner } from './pages/BudgetPlanner'
 import { SavingsGoals } from './pages/SavingsGoals'
@@ -20,6 +21,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/transactions/:id" element={<Transactions />} />
+            <Route path="/transactions/connect-bank" element={<ConnectBank />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/budget-planner" element={<BudgetPlanner />} />
             <Route path="/savings-goals" element={<SavingsGoals />} />

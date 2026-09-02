@@ -45,3 +45,14 @@ Supabase — there's no separate mock/localStorage data layer to switch off.
 Auth → Providers → Email is on by default, which is enough for a personal app.
 Turn on "Confirm email" only if you want the verification step; for solo/dev use it's
 fine to leave it off.
+
+## 6. (Later) Bank sync via Plaid
+
+1. Run [`migrations/0010_plaid_connections.sql`](migrations/0010_plaid_connections.sql) and [`migrations/0011_plaid_connections_fn.sql`](migrations/0011_plaid_connections_fn.sql) the same way as step 2, in order.
+2. Create a free account at [plaid.com](https://plaid.com) and grab your `client_id` and `sandbox` secret from the dashboard.
+3. Deploy the `plaid-link-token`, `plaid-exchange-token`, and `plaid-sync-transactions` functions under `functions/`, then set these secrets on the project (Edge Functions → Manage secrets, or `supabase secrets set`):
+   - `PLAID_CLIENT_ID`
+   - `PLAID_SECRET`
+   - `PLAID_ENV` — `sandbox` while testing, `production` once Plaid approves the app for real accounts.
+
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected into every edge function automatically — no need to set those yourself.

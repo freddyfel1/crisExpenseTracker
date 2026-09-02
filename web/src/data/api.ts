@@ -344,3 +344,47 @@ export async function parseReceipt(path: string): Promise<ParsedReceipt> {
   if (error) throw error
   return data as ParsedReceipt
 }
+
+export interface PlaidConnection {
+  id: string
+  itemId: string
+  institutionName: string | null
+  createdAt: string
+}
+
+export async function fetchPlaidConnections(): Promise<PlaidConnection[]> {
+  const { data, error } = await supabase.rpc('get_plaid_connections')
+  if (error) throw error
+  return (data as { id: string; item_id: string; institution_name: string | null; created_at: string }[])
+    .map((row) => ({
+      id: row.id,
+      itemId: row.item_id,
+      institutionName: row.institution_name,
+      createdAt: row.created_at,
+    }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+export async function createPlaidLinkToken(): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('plaid-link-token', { body: {} })
+  if (error) throw error
+  return data.link_token as string
+}
+
+export async function exchangePlaidPublicToken(publicToken: string, institutionName: string | null) {
+  const { error } = await supabase.functions.invoke('plaid-exchange-token', {
+    body: { public_token: publicToken, institution_name: institutionName },
+  })
+  if (error) throw error
+}
+
+export async function disconnectPlaidBank(id: string) {
+  const { error } = await supabase.functions.invoke('plaid-disconnect-bank', { body: { id } })
+  if (error) throw error
+}
+
+export async function syncPlaidTransactions(): Promise<{ synced: number; removed: number; items: number }> {
+  const { data, error } = await supabase.functions.invoke('plaid-sync-transactions', { body: {} })
+  if (error) throw error
+  return data
+}
