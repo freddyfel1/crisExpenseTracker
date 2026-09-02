@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard,
   Receipt,
@@ -22,9 +23,56 @@ const NAV_ITEMS = [
   { to: '/how-to', label: 'How To', icon: HelpCircle },
 ]
 
+const MIN_WIDTH = 180
+const MAX_WIDTH = 420
+const DEFAULT_WIDTH = 240
+const STORAGE_KEY = 'sidebar-width'
+
 export function Sidebar() {
+  const asideRef = useRef<HTMLElement>(null)
+  const draggingRef = useRef(false)
+  const [width, setWidth] = useState(() => {
+    const stored = Number(localStorage.getItem(STORAGE_KEY))
+    return stored >= MIN_WIDTH && stored <= MAX_WIDTH ? stored : DEFAULT_WIDTH
+  })
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!draggingRef.current || !asideRef.current) return
+      const left = asideRef.current.getBoundingClientRect().left
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX - left))
+      setWidth(next)
+    }
+    function handleMouseUp() {
+      if (!draggingRef.current) return
+      draggingRef.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, String(width))
+  }, [width])
+
+  function handleResizeStart() {
+    draggingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
+
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] px-4 py-6">
+    <aside
+      ref={asideRef}
+      className="relative hidden md:flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] px-4 py-6"
+      style={{ width }}
+    >
       <div className="flex items-center gap-2 px-2 mb-8">
         <div className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--primary)] text-white">
           <Wallet size={18} />
@@ -59,6 +107,15 @@ export function Sidebar() {
         <p className="text-[12px] text-[var(--text-soft)]">
           Capture a receipt here or on the crisExpenseTracker mobile app — either way it syncs automatically.
         </p>
+      </div>
+
+      <div
+        onMouseDown={handleResizeStart}
+        onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
+        className="absolute top-0 -right-1 h-full w-2 cursor-col-resize group"
+        title="Drag to resize, double-click to reset"
+      >
+        <div className="mx-auto h-full w-px bg-transparent group-hover:bg-[var(--primary)] transition-colors" />
       </div>
     </aside>
   )
