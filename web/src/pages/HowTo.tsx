@@ -30,11 +30,45 @@ export function HowTo() {
       </Section>
 
       <Section icon={<Receipt size={16} />} title="Transactions">
+        <p>Every purchase you log lives here. There are two ways to add one:</p>
+        <div>
+          <p className="font-medium text-[var(--ink)]">Adding a transaction by hand</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-5">
+            <li>
+              Tap <b>Add transaction</b> — a panel slides in from the right.
+            </li>
+            <li>Fill in the merchant, date, and amount (required).</li>
+            <li>Pick a category, and optionally add tax, tip, payment method, or notes.</li>
+            <li>
+              Tap <b>Add transaction</b> at the bottom of the panel to save it.
+            </li>
+          </ol>
+        </div>
+        <div>
+          <p className="font-medium text-[var(--ink)]">Using Capture receipt</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-5">
+            <li>
+              Tap <b>Capture receipt</b> and take a photo of the receipt (or choose one from your
+              photos).
+            </li>
+            <li>
+              The app uploads it and reads it automatically — merchant, amount, date, and category get
+              filled in for you.
+            </li>
+            <li>
+              The transaction detail panel opens with those fields pre-filled so you can check them and
+              fix anything that was read wrong, then save.
+            </li>
+            <li>
+              If the automatic read fails, a blank transaction with the receipt photo attached is still
+              created — just fill in the details by hand and save.
+            </li>
+          </ol>
+        </div>
         <p>
-          Every purchase you log lives here. Tap <b>Add transaction</b> to enter one by hand, or{' '}
-          <b>Capture receipt</b> to snap a photo and have it filled in automatically. Use the search box
-          and the Year/Month/Category dropdowns to narrow the list. The stat cards above the table show
-          income/expense/balance for the selected month, plus a running year-to-date total.
+          Use the search box and the Year/Month/Category dropdowns to narrow the list. The stat cards
+          above the table show income/expense/balance for the selected month, plus a running
+          year-to-date total.
         </p>
       </Section>
 
