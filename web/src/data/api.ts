@@ -365,8 +365,8 @@ export async function fetchPlaidConnections(): Promise<PlaidConnection[]> {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
-export async function createPlaidLinkToken(): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('plaid-link-token', { body: {} })
+export async function createPlaidLinkToken(redirectUri: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('plaid-link-token', { body: { redirect_uri: redirectUri } })
   if (error) throw error
   return data.link_token as string
 }

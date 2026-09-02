@@ -2,6 +2,10 @@
 // hosted Link widget. Bank credentials are entered inside that widget, never in this app —
 // this function only ever sees a client_user_id and returns a short-lived token.
 //
+// OAuth institutions (Chase, most big banks) redirect out to their own real login page
+// and back, so the token needs to carry a redirect_uri that's pre-registered with Plaid
+// (Team Settings -> API -> Allowed redirect URIs) — non-OAuth/Sandbox flows ignore it.
+//
 // verify_jwt is off (matches parse-receipt): the platform-level JWT gate also blocks CORS
 // preflight OPTIONS requests, which never carry an Authorization header. Auth is checked
 // manually below instead, exactly as strictly as verify_jwt would.
@@ -32,6 +36,13 @@ Deno.serve(async (req: Request) => {
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) return json({ error: 'Missing authorization' }, 401)
 
+  let redirect_uri: string | undefined
+  try {
+    ;({ redirect_uri } = await req.json())
+  } catch {
+    // body is optional — redirect_uri just won't be set
+  }
+
   const clientId = Deno.env.get('PLAID_CLIENT_ID')
   const secret = Deno.env.get('PLAID_SECRET')
   const env = Deno.env.get('PLAID_ENV') ?? 'sandbox'
@@ -59,6 +70,7 @@ Deno.serve(async (req: Request) => {
       products: ['transactions'],
       country_codes: ['US'],
       language: 'en',
+      ...(redirect_uri ? { redirect_uri } : {}),
     }),
   })
 

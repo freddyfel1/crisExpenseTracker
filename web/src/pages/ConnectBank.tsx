@@ -101,18 +101,30 @@ export function ConnectBank() {
   )
 }
 
+// Chase and most major banks use Plaid's OAuth flow: the browser leaves this page
+// entirely for the bank's real login, then comes back with an oauth_state_id in the
+// URL. The link token has to survive that round trip (React state doesn't), so it's
+// stashed in sessionStorage before redirecting and picked back up on the resumed load.
+const REDIRECT_URI = `${window.location.origin}/transactions/connect-bank`
+const PENDING_TOKEN_KEY = 'plaid-link-token-pending'
+
 function ConnectBankButton({ onConnected }: { onConnected: () => void }) {
-  const [linkToken, setLinkToken] = useState<string | null>(null)
+  const isOAuthResume = window.location.search.includes('oauth_state_id')
+  const [linkToken, setLinkToken] = useState<string | null>(() =>
+    isOAuthResume ? sessionStorage.getItem(PENDING_TOKEN_KEY) : null,
+  )
   const [starting, setStarting] = useState(false)
 
   const exchangeMutation = useMutation({
     mutationFn: ({ publicToken, institutionName }: { publicToken: string; institutionName: string | null }) =>
       exchangePlaidPublicToken(publicToken, institutionName),
     onSuccess: () => {
+      sessionStorage.removeItem(PENDING_TOKEN_KEY)
       setLinkToken(null)
       onConnected()
     },
     onError: (err) => {
+      sessionStorage.removeItem(PENDING_TOKEN_KEY)
       setLinkToken(null)
       window.alert(err instanceof Error ? err.message : 'Could not connect that bank account.')
     },
@@ -120,21 +132,29 @@ function ConnectBankButton({ onConnected }: { onConnected: () => void }) {
 
   const { open, ready } = usePlaidLink({
     token: linkToken ?? '',
+    receivedRedirectUri: isOAuthResume ? window.location.href : undefined,
     onSuccess: (publicToken, metadata) => {
       if (!publicToken) return
       exchangeMutation.mutate({ publicToken, institutionName: metadata.institution?.name ?? null })
     },
-    onExit: () => setLinkToken(null),
+    onExit: () => {
+      sessionStorage.removeItem(PENDING_TOKEN_KEY)
+      setLinkToken(null)
+    },
   })
 
   useEffect(() => {
-    if (linkToken && ready) open()
-  }, [linkToken, ready, open])
+    if (linkToken && ready) {
+      open()
+      if (isOAuthResume) window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [linkToken, ready, open, isOAuthResume])
 
   const startLink = async () => {
     setStarting(true)
     try {
-      const token = await createPlaidLinkToken()
+      const token = await createPlaidLinkToken(REDIRECT_URI)
+      sessionStorage.setItem(PENDING_TOKEN_KEY, token)
       setLinkToken(token)
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not start bank connection.')
