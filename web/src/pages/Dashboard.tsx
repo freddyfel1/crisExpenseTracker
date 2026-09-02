@@ -19,8 +19,9 @@ import { SpendTrend } from '../components/SpendTrend'
 import { IncomeExpenseTrend } from '../components/IncomeExpenseTrend'
 
 export function Dashboard() {
-  const { transactions, categories, monthlyIncomes, saveMonthlyIncome } = useStore()
+  const { transactions, categories, monthlyIncomes, saveMonthlyIncome, profile } = useStore()
   const { month } = usePeriod()
+  const firstName = profile?.name?.trim().split(/\s+/)[0]
 
   const monthTxns = transactionsForMonth(transactions, month)
   const spend = spendByCategory(monthTxns)
@@ -39,7 +40,12 @@ export function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-[26px] text-[var(--ink)]">Dashboard</h1>
+          <h1 className="font-display text-[26px] text-[var(--ink)]">
+            Dashboard
+            {firstName && (
+              <span className="ml-2 text-[var(--primary)]">— Welcome, {firstName}</span>
+            )}
+          </h1>
           <p className="text-[13px] text-[var(--text-soft)]">
             Your financial position for {monthKeyLabel(month)}
           </p>
