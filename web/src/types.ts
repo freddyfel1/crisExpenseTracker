@@ -38,6 +38,15 @@ export interface MonthlyIncome {
   otherIncome: number
 }
 
+export interface SavingsGoal {
+  id: string
+  name: string
+  targetAmount: number
+  currentAmount: number
+  targetDate: string | null // YYYY-MM-DD
+  sortOrder: number
+}
+
 export interface BudgetSection {
   id: string
   name: string

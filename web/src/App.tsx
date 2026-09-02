@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Categories } from './pages/Categories'
 import { BudgetPlanner } from './pages/BudgetPlanner'
+import { SavingsGoals } from './pages/SavingsGoals'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
 
@@ -20,6 +21,7 @@ function App() {
             <Route path="/transactions/:id" element={<Transactions />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/budget-planner" element={<BudgetPlanner />} />
+            <Route path="/savings-goals" element={<SavingsGoals />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

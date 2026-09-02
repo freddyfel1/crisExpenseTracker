@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Receipt, Tags, BarChart3, Settings as SettingsIcon, FileSpreadsheet } from 'lucide-react'
+import { LayoutDashboard, Receipt, Tags, BarChart3, Settings as SettingsIcon, FileSpreadsheet, PiggyBank } from 'lucide-react'
 
 const ITEMS = [
   { to: '/', icon: LayoutDashboard, end: true, label: 'Home' },
   { to: '/transactions', icon: Receipt, label: 'Txns' },
   { to: '/categories', icon: Tags, label: 'Categories' },
   { to: '/budget-planner', icon: FileSpreadsheet, label: 'Planner' },
+  { to: '/savings-goals', icon: PiggyBank, label: 'Goals' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/settings', icon: SettingsIcon, label: 'Settings' },
 ]

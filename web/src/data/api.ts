@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, Transaction } from '../types'
+import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, SavingsGoal, Transaction } from '../types'
 import { currentMonthKey } from '../utils/format'
 
 type TransactionRow = {
@@ -258,6 +258,58 @@ export async function upsertBudgetLineItem(
 
 export async function deleteBudgetLineItem(id: string) {
   const { error } = await supabase.from('budget_line_items').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchSavingsGoals(): Promise<SavingsGoal[]> {
+  const { data, error } = await supabase.from('savings_goals').select('*').order('sort_order')
+  if (error) throw error
+  return (
+    data as {
+      id: string
+      name: string
+      target_amount: number
+      current_amount: number
+      target_date: string | null
+      sort_order: number
+    }[]
+  ).map((g) => ({
+    id: g.id,
+    name: g.name,
+    targetAmount: Number(g.target_amount),
+    currentAmount: Number(g.current_amount),
+    targetDate: g.target_date,
+    sortOrder: g.sort_order,
+  }))
+}
+
+export async function upsertSavingsGoal(userId: string, g: Partial<SavingsGoal> & { id?: string }) {
+  const { data, error } = await supabase
+    .from('savings_goals')
+    .upsert({
+      id: g.id,
+      user_id: userId,
+      name: g.name,
+      target_amount: g.targetAmount ?? 0,
+      current_amount: g.currentAmount ?? 0,
+      target_date: g.targetDate ?? null,
+      sort_order: g.sortOrder ?? 0,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return {
+    id: data.id,
+    name: data.name,
+    targetAmount: Number(data.target_amount),
+    currentAmount: Number(data.current_amount),
+    targetDate: data.target_date,
+    sortOrder: data.sort_order,
+  } as SavingsGoal
+}
+
+export async function deleteSavingsGoal(id: string) {
+  const { error } = await supabase.from('savings_goals').delete().eq('id', id)
   if (error) throw error
 }
 

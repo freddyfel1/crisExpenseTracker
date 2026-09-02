@@ -7,6 +7,7 @@ import {
   Settings as SettingsIcon,
   Wallet,
   FileSpreadsheet,
+  PiggyBank,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/transactions', label: 'Transactions', icon: Receipt },
   { to: '/categories', label: 'Categories', icon: Tags },
   { to: '/budget-planner', label: 'Budget Planner', icon: FileSpreadsheet },
+  { to: '/savings-goals', label: 'Savings Goals', icon: PiggyBank },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

@@ -3,6 +3,7 @@ import {
   deleteBudgetLineItem as apiDeleteBudgetLineItem,
   deleteBudgetSection as apiDeleteBudgetSection,
   deleteCategory as apiDeleteCategory,
+  deleteSavingsGoal as apiDeleteSavingsGoal,
   deleteTransaction as apiDeleteTransaction,
   duplicateBudgetMonth as apiDuplicateBudgetMonth,
   fetchBudgetLineItems,
@@ -10,15 +11,17 @@ import {
   fetchCategories,
   fetchMonthlyIncome,
   fetchProfile,
+  fetchSavingsGoals,
   fetchTransactions,
   updateProfile,
   upsertBudgetLineItem,
   upsertBudgetSection,
   upsertCategory,
   upsertMonthlyIncome,
+  upsertSavingsGoal,
   upsertTransaction,
 } from './api'
-import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, Transaction } from '../types'
+import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, SavingsGoal, Transaction } from '../types'
 import { useSession } from '../hooks/useSession'
 
 // A thin wrapper over TanStack Query so every page can keep reading
@@ -57,6 +60,11 @@ export function useStore() {
   const monthlyIncomeQuery = useQuery({
     queryKey: ['monthlyIncome', userId],
     queryFn: fetchMonthlyIncome,
+    enabled: Boolean(userId),
+  })
+  const savingsGoalsQuery = useQuery({
+    queryKey: ['savingsGoals', userId],
+    queryFn: fetchSavingsGoals,
     enabled: Boolean(userId),
   })
 
@@ -107,6 +115,14 @@ export function useStore() {
       upsertMonthlyIncome(userId!, entry),
     onSuccess: () => invalidate('monthlyIncome'),
   })
+  const saveSavingsGoal = useMutation({
+    mutationFn: (g: Partial<SavingsGoal> & { id?: string }) => upsertSavingsGoal(userId!, g),
+    onSuccess: () => invalidate('savingsGoals'),
+  })
+  const removeSavingsGoal = useMutation({
+    mutationFn: (id: string) => apiDeleteSavingsGoal(id),
+    onSuccess: () => invalidate('savingsGoals'),
+  })
   const duplicateBudgetMonth = useMutation({
     mutationFn: ({ fromSections, fromItemsBySection, toMonthKey }: {
       fromSections: BudgetSection[]
@@ -126,6 +142,7 @@ export function useStore() {
     budgetSections: budgetSectionsQuery.data ?? ([] as BudgetSection[]),
     budgetLineItems: budgetLineItemsQuery.data ?? ([] as BudgetLineItem[]),
     monthlyIncomes: monthlyIncomeQuery.data ?? ([] as MonthlyIncome[]),
+    savingsGoals: savingsGoalsQuery.data ?? ([] as SavingsGoal[]),
     isLoading: transactionsQuery.isLoading || categoriesQuery.isLoading,
 
     addTransaction: (t: Transaction) => saveTransaction.mutate(t),
@@ -155,5 +172,8 @@ export function useStore() {
       toMonthKey: string,
     ) => duplicateBudgetMonth.mutate({ fromSections, fromItemsBySection, toMonthKey }),
     isDuplicatingBudgetMonth: duplicateBudgetMonth.isPending,
+
+    saveSavingsGoal: (g: Partial<SavingsGoal> & { id?: string }) => saveSavingsGoal.mutate(g),
+    deleteSavingsGoal: (id: string) => removeSavingsGoal.mutate(id),
   }
 }
