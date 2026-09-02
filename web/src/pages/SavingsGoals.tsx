@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { formatMoney, formatDate } from '../utils/format'
@@ -47,7 +46,7 @@ export function SavingsGoals() {
           <GoalCard
             key={goal.id}
             goal={goal}
-            onSave={(patch) => saveSavingsGoal({ id: goal.id, ...goal, ...patch })}
+            onSave={(patch) => saveSavingsGoal({ ...goal, ...patch })}
             onDelete={() => {
               if (window.confirm(`Delete "${goal.name}"? This cannot be undone.`)) deleteSavingsGoal(goal.id)
             }}
