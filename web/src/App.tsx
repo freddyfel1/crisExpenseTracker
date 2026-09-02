@@ -8,6 +8,7 @@ import { BudgetPlanner } from './pages/BudgetPlanner'
 import { SavingsGoals } from './pages/SavingsGoals'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
+import { HowTo } from './pages/HowTo'
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             <Route path="/savings-goals" element={<SavingsGoals />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/how-to" element={<HowTo />} />
           </Routes>
         </div>
       </main>

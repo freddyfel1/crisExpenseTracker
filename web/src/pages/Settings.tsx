@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, LogOut } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Download, HelpCircle, LogOut } from 'lucide-react'
 import { fetchProfile, updateProfile } from '../data/api'
 import { useSession } from '../hooks/useSession'
 import { useStore } from '../data/store'
@@ -95,6 +96,15 @@ export function Settings() {
             onChange={(v) => saveProfile.mutate({ notifyReceiptSync: v })}
           />
         </div>
+      </Card>
+
+      <Card title="Help">
+        <Link
+          to="/how-to"
+          className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--primary)] hover:underline"
+        >
+          <HelpCircle size={15} /> How to use this app
+        </Link>
       </Card>
 
       <Card title="Data">

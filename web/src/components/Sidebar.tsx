@@ -8,6 +8,7 @@ import {
   Wallet,
   FileSpreadsheet,
   PiggyBank,
+  HelpCircle,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { to: '/savings-goals', label: 'Savings Goals', icon: PiggyBank },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
+  { to: '/how-to', label: 'How To', icon: HelpCircle },
 ]
 
 export function Sidebar() {
