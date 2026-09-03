@@ -65,6 +65,17 @@ export function HowTo() {
             </li>
           </ol>
         </div>
+        <div>
+          <p className="font-medium text-[var(--ink)]">Connect to bank</p>
+          <p className="mt-1">
+            Instead of entering everything by hand, link a real bank account (via Settings or the
+            Transactions menu) and let it import purchases for you. Tap <b>Connect a bank</b>, then
+            search for and log in to your bank through Plaid's secure window — your credentials go
+            straight to Plaid, never through this app. Once connected, tap <b>Sync now</b> anytime to
+            pull in new transactions, or disconnect a bank from the same page (past synced transactions
+            stay put).
+          </p>
+        </div>
         <p>
           Use the search box and the Year/Month/Category dropdowns to narrow the list. The stat cards
           above the table show income/expense/balance for the selected month, plus a running
