@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowUpDown, ChevronDown, Plus, Search, PiggyBank, Wallet, Scale, Landmark } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, Plus, Search, PiggyBank, Wallet, Scale, Landmark, Upload } from 'lucide-react'
 import { useStore } from '../data/store'
 import {
   currentCalendarMonth,
@@ -148,6 +148,12 @@ export function Transactions() {
         </div>
         <div className="flex items-center gap-2">
           <CaptureReceiptButton />
+          <button
+            onClick={() => navigate('/transactions/upload-docs')}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)]"
+          >
+            <Upload size={15} /> Upload docs
+          </button>
           <button
             onClick={() => navigate('/transactions/new')}
             className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"

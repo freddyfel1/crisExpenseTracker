@@ -62,6 +62,28 @@ export async function deleteTransaction(id: string) {
   if (error) throw error
 }
 
+export interface ImportableTransaction {
+  date: string
+  merchant: string
+  amount: number
+  paymentMethod: string | null
+}
+
+export async function importTransactions(userId: string, rows: ImportableTransaction[]) {
+  const { error } = await supabase.from('transactions').insert(
+    rows.map((r) => ({
+      user_id: userId,
+      merchant: r.merchant,
+      amount: r.amount,
+      occurred_on: r.date,
+      payment_method: r.paymentMethod,
+      tags: [],
+      source: 'csv',
+    })),
+  )
+  if (error) throw error
+}
+
 export async function fetchCategories(): Promise<Category[]> {
   const { data, error } = await supabase.from('categories').select('*').order('name')
   if (error) throw error

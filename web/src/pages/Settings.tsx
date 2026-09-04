@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Download, HelpCircle, Landmark, LogOut } from 'lucide-react'
+import { Download, HelpCircle, Landmark, LogOut, Upload } from 'lucide-react'
 import { fetchProfile, updateProfile } from '../data/api'
 import { useSession } from '../hooks/useSession'
 import { useStore } from '../data/store'
@@ -99,12 +99,20 @@ export function Settings() {
       </Card>
 
       <Card title="Bank sync">
-        <Link
-          to="/transactions/connect-bank"
-          className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--primary)] hover:underline"
-        >
-          <Landmark size={15} /> Connect to bank
-        </Link>
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <Link
+            to="/transactions/connect-bank"
+            className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--primary)] hover:underline"
+          >
+            <Landmark size={15} /> Connect to bank
+          </Link>
+          <Link
+            to="/transactions/upload-docs"
+            className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--primary)] hover:underline"
+          >
+            <Upload size={15} /> Upload docs
+          </Link>
+        </div>
       </Card>
 
       <Card title="Help">

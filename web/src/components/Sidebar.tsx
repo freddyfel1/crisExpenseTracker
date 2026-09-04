@@ -11,6 +11,7 @@ import {
   PiggyBank,
   HelpCircle,
   Landmark,
+  Upload,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -19,7 +20,10 @@ const NAV_ITEMS = [
     to: '/transactions',
     label: 'Transactions',
     icon: Receipt,
-    children: [{ to: '/transactions/connect-bank', label: 'Connect to bank', icon: Landmark }],
+    children: [
+      { to: '/transactions/connect-bank', label: 'Connect to bank', icon: Landmark },
+      { to: '/transactions/upload-docs', label: 'Upload docs', icon: Upload },
+    ],
   },
   { to: '/categories', label: 'Categories', icon: Tags },
   { to: '/budget-planner', label: 'Budget Planner', icon: FileSpreadsheet },

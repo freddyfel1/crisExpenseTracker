@@ -13,6 +13,7 @@ import {
   fetchProfile,
   fetchSavingsGoals,
   fetchTransactions,
+  importTransactions,
   updateProfile,
   upsertBudgetLineItem,
   upsertBudgetSection,
@@ -21,6 +22,7 @@ import {
   upsertSavingsGoal,
   upsertTransaction,
 } from './api'
+import type { ImportableTransaction } from './api'
 import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, SavingsGoal, Transaction } from '../types'
 import { useSession } from '../hooks/useSession'
 
@@ -76,6 +78,10 @@ export function useStore() {
   })
   const removeTransaction = useMutation({
     mutationFn: (id: string) => apiDeleteTransaction(id),
+    onSuccess: () => invalidate('transactions'),
+  })
+  const bulkImportTransactions = useMutation({
+    mutationFn: (rows: ImportableTransaction[]) => importTransactions(userId!, rows),
     onSuccess: () => invalidate('transactions'),
   })
   const saveCategory = useMutation({
@@ -148,6 +154,8 @@ export function useStore() {
     addTransaction: (t: Transaction) => saveTransaction.mutate(t),
     updateTransaction: (id: string, patch: Partial<Transaction>) => saveTransaction.mutate({ id, ...patch }),
     deleteTransaction: (id: string) => removeTransaction.mutate(id),
+    importTransactions: (rows: ImportableTransaction[]) => bulkImportTransactions.mutateAsync(rows),
+    isImportingTransactions: bulkImportTransactions.isPending,
 
     addCategory: (c: Category) => saveCategory.mutate(c),
     updateCategory: (id: string, patch: Partial<Category>) => {

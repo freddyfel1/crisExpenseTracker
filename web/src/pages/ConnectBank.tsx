@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { usePlaidLink } from 'react-plaid-link'
-import { Landmark, RefreshCw, Trash2 } from 'lucide-react'
+import { Landmark, RefreshCw, Trash2, Upload } from 'lucide-react'
 import {
   createPlaidLinkToken,
   disconnectPlaidBank,
@@ -97,6 +98,14 @@ export function ConnectBank() {
           </div>
         </div>
       </Card>
+
+      <p className="text-[12.5px] text-[var(--text-soft)]">
+        Not comfortable linking your bank account? You can{' '}
+        <Link to="/transactions/upload-docs" className="inline-flex items-center gap-1 font-medium text-[var(--primary)] hover:underline">
+          <Upload size={12} /> upload a CSV statement
+        </Link>{' '}
+        instead — nothing is shared with a third party, and you choose what gets imported.
+      </p>
     </div>
   )
 }

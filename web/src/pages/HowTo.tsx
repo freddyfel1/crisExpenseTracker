@@ -76,6 +76,18 @@ export function HowTo() {
             stay put).
           </p>
         </div>
+        <div>
+          <p className="font-medium text-[var(--ink)]">Upload docs</p>
+          <p className="mt-1">
+            Not comfortable linking your bank account through Plaid? From the Transactions menu (or
+            Settings), open <b>Upload docs</b> and choose a CSV statement you've downloaded from your
+            bank's website instead — the file never leaves your browser except for the transactions you
+            choose to import. The importer only pulls in outgoing (debit) purchases as expenses, since
+            income is tracked separately on the Dashboard; it also flags likely transfers and anything
+            that looks like a duplicate of a transaction you already have, so you can review the list and
+            uncheck anything before confirming.
+          </p>
+        </div>
         <p>
           Use the search box and the Year/Month/Category dropdowns to narrow the list. The stat cards
           above the table show income/expense/balance for the selected month, plus a running
