@@ -64,6 +64,10 @@ export function UploadTransactions() {
     setCandidates((prev) => prev && prev.map((c) => (c.key === key ? { ...c, selected: !c.selected } : c)))
   }
 
+  const setAllSelected = (selected: boolean) => {
+    setCandidates((prev) => prev && prev.map((c) => ({ ...c, selected })))
+  }
+
   const selectedRows = candidates?.filter((c) => c.selected) ?? []
 
   const handleImport = async () => {
@@ -122,11 +126,21 @@ export function UploadTransactions() {
           </button>
         ) : (
           <div className="space-y-3">
-            <p className="text-[12.5px] text-[var(--text-soft)]">
-              {candidates.length} debit transaction{candidates.length === 1 ? '' : 's'} found
-              {creditCount > 0 && ` (${creditCount} credit${creditCount === 1 ? '' : 's'} skipped — income is tracked separately)`}
-              . {selectedRows.length} selected to import.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[12.5px] text-[var(--text-soft)]">
+                {candidates.length} debit transaction{candidates.length === 1 ? '' : 's'} found
+                {creditCount > 0 && ` (${creditCount} credit${creditCount === 1 ? '' : 's'} skipped — income is tracked separately)`}
+                . {selectedRows.length} selected to import.
+              </p>
+              <div className="flex items-center gap-3 text-[12.5px] font-medium text-[var(--primary)]">
+                <button onClick={() => setAllSelected(true)} className="hover:underline">
+                  Select all
+                </button>
+                <button onClick={() => setAllSelected(false)} className="hover:underline">
+                  Deselect all
+                </button>
+              </div>
+            </div>
             <div className="max-h-[420px] overflow-y-auto overflow-x-auto rounded-lg border border-[var(--border-soft)]">
               <table className="w-full text-left text-[12.5px]">
                 <tbody>
