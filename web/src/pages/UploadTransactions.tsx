@@ -10,6 +10,7 @@ interface Candidate extends ParsedCsvRow {
   key: string
   selected: boolean
   duplicate: boolean
+  possibleDuplicate: boolean
 }
 
 export function UploadTransactions() {
@@ -23,8 +24,16 @@ export function UploadTransactions() {
   const [imported, setImported] = useState<number | null>(null)
   const [dragActive, setDragActive] = useState(false)
 
+  // Two tiers: an exact match on date + amount + merchant text is a near-certain
+  // duplicate. A match on just date + amount is softer — Plaid's cleaned-up merchant
+  // name and a bank's raw CSV description often don't match textually even for the
+  // same real transaction, so this still needs to be surfaced, just not as certainly.
   const existingKeys = useMemo(
     () => new Set(transactions.map((t) => `${t.date}|${t.amount}|${t.merchant.toLowerCase()}`)),
+    [transactions],
+  )
+  const existingDateAmountKeys = useMemo(
+    () => new Set(transactions.map((t) => `${t.date}|${t.amount}`)),
     [transactions],
   )
 
@@ -55,7 +64,14 @@ export function UploadTransactions() {
       rows.map((r, i) => {
         const key = `${r.date}|${r.amount}|${r.merchant.toLowerCase()}`
         const duplicate = existingKeys.has(key)
-        return { ...r, key: `${i}-${key}`, selected: !duplicate && !r.isLikelyTransfer, duplicate }
+        const possibleDuplicate = !duplicate && existingDateAmountKeys.has(`${r.date}|${r.amount}`)
+        return {
+          ...r,
+          key: `${i}-${key}`,
+          selected: !duplicate && !possibleDuplicate && !r.isLikelyTransfer,
+          duplicate,
+          possibleDuplicate,
+        }
       }),
     )
   }
@@ -64,14 +80,31 @@ export function UploadTransactions() {
     setCandidates((prev) => prev && prev.map((c) => (c.key === key ? { ...c, selected: !c.selected } : c)))
   }
 
-  const setAllSelected = (selected: boolean) => {
-    setCandidates((prev) => prev && prev.map((c) => ({ ...c, selected })))
+  // "Select all" deliberately leaves duplicate-flagged rows alone rather than
+  // force-checking them — re-including an already-imported transaction has to be
+  // a deliberate per-row choice, not a side effect of a bulk action.
+  const selectAll = () => {
+    setCandidates(
+      (prev) => prev && prev.map((c) => (c.duplicate || c.possibleDuplicate ? c : { ...c, selected: true })),
+    )
+  }
+  const deselectAll = () => {
+    setCandidates((prev) => prev && prev.map((c) => ({ ...c, selected: false })))
   }
 
   const selectedRows = candidates?.filter((c) => c.selected) ?? []
 
   const handleImport = async () => {
     if (selectedRows.length === 0) return
+    const flaggedSelected = selectedRows.filter((r) => r.duplicate || r.possibleDuplicate).length
+    if (flaggedSelected > 0) {
+      const noun = flaggedSelected === 1 ? 'transaction looks' : 'transactions look'
+      const ok = window.confirm(
+        `${flaggedSelected} selected ${noun} like it might already be in your transactions (same date and ` +
+          `amount, possibly with a different description). Import anyway and risk a duplicate?`,
+      )
+      if (!ok) return
+    }
     await importTransactions(
       selectedRows.map((r) => ({ date: r.date, merchant: r.merchant, amount: r.amount, paymentMethod: r.paymentMethod })),
     )
@@ -133,10 +166,14 @@ export function UploadTransactions() {
                 . {selectedRows.length} selected to import.
               </p>
               <div className="flex items-center gap-3 text-[12.5px] font-medium text-[var(--primary)]">
-                <button onClick={() => setAllSelected(true)} className="hover:underline">
+                <button
+                  onClick={selectAll}
+                  title="Leaves rows flagged as already imported unchecked"
+                  className="hover:underline"
+                >
                   Select all
                 </button>
-                <button onClick={() => setAllSelected(false)} className="hover:underline">
+                <button onClick={deselectAll} className="hover:underline">
                   Deselect all
                 </button>
               </div>
@@ -154,6 +191,11 @@ export function UploadTransactions() {
                         {c.merchant}
                         {c.duplicate && (
                           <span className="ml-1.5 text-[11px] italic text-[var(--text-soft)]">already imported?</span>
+                        )}
+                        {!c.duplicate && c.possibleDuplicate && (
+                          <span className="ml-1.5 text-[11px] italic text-[var(--warn)]">
+                            possible duplicate (same date &amp; amount)
+                          </span>
                         )}
                         {c.isLikelyTransfer && (
                           <span className="ml-1.5 text-[11px] italic text-[var(--text-soft)]">transfer</span>
