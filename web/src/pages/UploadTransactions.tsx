@@ -21,6 +21,7 @@ export function UploadTransactions() {
   const [creditCount, setCreditCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [imported, setImported] = useState<number | null>(null)
+  const [dragActive, setDragActive] = useState(false)
 
   const existingKeys = useMemo(
     () => new Set(transactions.map((t) => `${t.date}|${t.amount}|${t.merchant.toLowerCase()}`)),
@@ -100,10 +101,23 @@ export function UploadTransactions() {
         {!candidates ? (
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-[var(--border)] py-12 text-[var(--text-soft)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragActive(true)
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragActive(false)
+              const file = e.dataTransfer.files?.[0]
+              if (file) handleFile(file)
+            }}
+            className={`flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed py-12 text-[var(--text-soft)] hover:border-[var(--primary)] hover:text-[var(--primary)] ${
+              dragActive ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)]'
+            }`}
           >
             <Upload size={22} />
-            <span className="text-[13px] font-medium">{fileName ?? 'Choose a CSV file'}</span>
+            <span className="text-[13px] font-medium">{fileName ?? 'Choose a CSV file, or drag one here'}</span>
             <span className="text-[12px]">Only outgoing (debit) transactions are imported as expenses.</span>
           </button>
         ) : (
