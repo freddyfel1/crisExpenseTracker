@@ -6,6 +6,9 @@ import { looksLikeBinarySpreadsheet, parseBankCsv, type ParsedCsvRow } from '../
 import { formatDate, formatMoney } from '../utils/format'
 import { Card } from '../components/Card'
 
+const selectClass =
+  'mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--paper)] px-2 py-1.5 text-[13px] text-[var(--ink)]'
+
 interface Candidate extends ParsedCsvRow {
   key: string
   selected: boolean
@@ -24,6 +27,17 @@ export function UploadTransactions() {
   const [imported, setImported] = useState<number | null>(null)
   const [dragActive, setDragActive] = useState(false)
 
+  // Set when auto-detection can't recognize the date/description/amount columns —
+  // the raw text is kept around so we can re-parse it once the user maps columns.
+  const [rawText, setRawText] = useState<string | null>(null)
+  const [unmappedHeaders, setUnmappedHeaders] = useState<string[] | null>(null)
+  const [mapDate, setMapDate] = useState('')
+  const [mapDesc, setMapDesc] = useState('')
+  const [amountMode, setAmountMode] = useState<'single' | 'split'>('single')
+  const [mapAmount, setMapAmount] = useState('')
+  const [mapDebit, setMapDebit] = useState('')
+  const [mapCredit, setMapCredit] = useState('')
+
   // Two tiers: an exact match on date + amount + merchant text is a near-certain
   // duplicate. A match on just date + amount is softer — Plaid's cleaned-up merchant
   // name and a bank's raw CSV description often don't match textually even for the
@@ -37,28 +51,18 @@ export function UploadTransactions() {
     [transactions],
   )
 
-  const handleFile = async (file: File) => {
-    setError(null)
-    setImported(null)
-    setFileName(file.name)
+  const resetMapping = () => {
+    setRawText(null)
+    setUnmappedHeaders(null)
+    setMapDate('')
+    setMapDesc('')
+    setAmountMode('single')
+    setMapAmount('')
+    setMapDebit('')
+    setMapCredit('')
+  }
 
-    const header = new Uint8Array(await file.slice(0, 4).arrayBuffer())
-    if (looksLikeBinarySpreadsheet(header)) {
-      setError(
-        'That looks like a real Excel file, not CSV text. In your bank’s download options, choose CSV ' +
-          '(or open the file in Excel and use "Save As → CSV") and upload that instead.',
-      )
-      setCandidates(null)
-      return
-    }
-
-    const text = await file.text()
-    const { rows, creditCount: credits } = parseBankCsv(text)
-    if (rows.length === 0) {
-      setError('No debit transactions found in that file. Expected a CSV with Date, Description, and Amount columns.')
-      setCandidates(null)
-      return
-    }
+  const applyParsedRows = (rows: ParsedCsvRow[], credits: number) => {
     setCreditCount(credits)
     setCandidates(
       rows.map((r, i) => {
@@ -74,6 +78,65 @@ export function UploadTransactions() {
         }
       }),
     )
+  }
+
+  const handleFile = async (file: File) => {
+    setError(null)
+    setImported(null)
+    setFileName(file.name)
+    resetMapping()
+
+    const header = new Uint8Array(await file.slice(0, 4).arrayBuffer())
+    if (looksLikeBinarySpreadsheet(header)) {
+      setError(
+        'That looks like a real Excel file, not CSV text. In your bank’s download options, choose CSV ' +
+          '(or open the file in Excel and use "Save As → CSV") and upload that instead.',
+      )
+      setCandidates(null)
+      return
+    }
+
+    const text = await file.text()
+    const result = parseBankCsv(text)
+    if (result.headers) {
+      // Auto-detection couldn't recognize the columns — let the user map them by hand
+      // instead of just rejecting the file.
+      setRawText(text)
+      setUnmappedHeaders(result.headers)
+      setCandidates(null)
+      return
+    }
+    if (result.rows.length === 0) {
+      setError(
+        "No debit transactions found in that file — every row was either a credit/deposit, a transfer, " +
+          "or couldn't be read.",
+      )
+      setCandidates(null)
+      return
+    }
+    applyParsedRows(result.rows, result.creditCount)
+  }
+
+  const mappingComplete =
+    mapDate !== '' && mapDesc !== '' && (amountMode === 'single' ? mapAmount !== '' : mapDebit !== '' || mapCredit !== '')
+
+  const handleApplyMapping = () => {
+    if (!rawText || !unmappedHeaders || !mappingComplete) return
+    const idx = (name: string) => unmappedHeaders.indexOf(name)
+    const result = parseBankCsv(rawText, {
+      dateCol: idx(mapDate),
+      descCol: idx(mapDesc),
+      amountCol: amountMode === 'single' ? idx(mapAmount) : undefined,
+      debitCol: amountMode === 'split' && mapDebit ? idx(mapDebit) : undefined,
+      creditCol: amountMode === 'split' && mapCredit ? idx(mapCredit) : undefined,
+    })
+    if (result.rows.length === 0) {
+      setError("Still couldn't find any debit transactions with those columns — double check your selections.")
+      return
+    }
+    setError(null)
+    resetMapping()
+    applyParsedRows(result.rows, result.creditCount)
   }
 
   const toggle = (key: string) => {
@@ -119,9 +182,11 @@ export function UploadTransactions() {
         <h1 className="font-display text-[26px] text-[var(--ink)]">Upload docs</h1>
         <p className="text-[13px] text-[var(--text-soft)]">
           Prefer not to link your bank account? Upload a CSV export of your statement instead — nothing is
-          shared with any third party, and you choose exactly which transactions get imported. If your
-          bank's download only offers "Excel", pick the CSV / comma-delimited option in that dialog, or
-          open the download in Excel and use Save As → CSV.
+          shared with any third party, and you choose exactly which transactions get imported. Comma-,
+          semicolon-, and tab-delimited files from any bank are supported; if the columns can't be
+          recognized automatically, you'll be able to match them up by hand. If your bank's download only
+          offers "Excel", pick the CSV / comma-delimited option in that dialog, or open the download in
+          Excel and use Save As → CSV.
         </p>
       </div>
 
@@ -135,7 +200,106 @@ export function UploadTransactions() {
           </p>
         )}
 
-        {!candidates ? (
+        {unmappedHeaders ? (
+          <div className="space-y-4">
+            <p className="text-[13px] text-[var(--text-soft)]">
+              We couldn't automatically recognize the date, description, or amount columns in{' '}
+              <span className="font-medium text-[var(--ink)]">{fileName}</span>. Match them up below.
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block text-[12.5px] font-medium text-[var(--text-soft)]">
+                Date column
+                <select value={mapDate} onChange={(e) => setMapDate(e.target.value)} className={selectClass}>
+                  <option value="">Select…</option>
+                  {unmappedHeaders.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-[12.5px] font-medium text-[var(--text-soft)]">
+                Description column
+                <select value={mapDesc} onChange={(e) => setMapDesc(e.target.value)} className={selectClass}>
+                  <option value="">Select…</option>
+                  {unmappedHeaders.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="space-y-2">
+              <div className="flex gap-4 text-[12.5px] text-[var(--text-soft)]">
+                <label className="flex items-center gap-1.5">
+                  <input type="radio" checked={amountMode === 'single'} onChange={() => setAmountMode('single')} />
+                  One amount column
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input type="radio" checked={amountMode === 'split'} onChange={() => setAmountMode('split')} />
+                  Separate debit/credit columns
+                </label>
+              </div>
+              {amountMode === 'single' ? (
+                <label className="block text-[12.5px] font-medium text-[var(--text-soft)]">
+                  Amount column
+                  <select value={mapAmount} onChange={(e) => setMapAmount(e.target.value)} className={selectClass}>
+                    <option value="">Select…</option>
+                    {unmappedHeaders.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block text-[12.5px] font-medium text-[var(--text-soft)]">
+                    Debit / withdrawal column
+                    <select value={mapDebit} onChange={(e) => setMapDebit(e.target.value)} className={selectClass}>
+                      <option value="">Select…</option>
+                      {unmappedHeaders.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-[12.5px] font-medium text-[var(--text-soft)]">
+                    Credit / deposit column (optional)
+                    <select value={mapCredit} onChange={(e) => setMapCredit(e.target.value)} className={selectClass}>
+                      <option value="">Select…</option>
+                      {unmappedHeaders.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleApplyMapping}
+                disabled={!mappingComplete}
+                className="flex-1 rounded-lg bg-[var(--primary)] py-2.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-60"
+              >
+                Use these columns
+              </button>
+              <button
+                onClick={() => {
+                  resetMapping()
+                  setFileName(null)
+                }}
+                className="rounded-lg border border-[var(--border)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)]"
+              >
+                Choose different file
+              </button>
+            </div>
+          </div>
+        ) : !candidates ? (
           <button
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => {
@@ -235,7 +399,7 @@ export function UploadTransactions() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv,text/csv,.xls,.xlsx"
+          accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
