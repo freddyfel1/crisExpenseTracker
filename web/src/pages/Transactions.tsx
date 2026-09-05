@@ -9,7 +9,7 @@ import {
   monthsUpTo,
   totalIncomeForMonths,
 } from '../data/selectors'
-import { resolveCategory } from '../utils/resolveCategory'
+import { resolveCategory, UNCATEGORIZED } from '../utils/resolveCategory'
 import { formatDate, formatMoney, monthKey, monthKeyLabel } from '../utils/format'
 import { ReceiptThumb } from '../components/ReceiptThumb'
 import { CategoryIcon } from '../components/CategoryIcon'
@@ -66,7 +66,8 @@ export function Transactions() {
   // range across every year with data.
   const searchFiltered = useMemo(() => {
     let rows = transactions
-    if (categoryFilter !== 'all') rows = rows.filter((t) => t.categoryId === categoryFilter)
+    if (categoryFilter === UNCATEGORIZED.id) rows = rows.filter((t) => t.categoryId == null)
+    else if (categoryFilter !== 'all') rows = rows.filter((t) => t.categoryId === categoryFilter)
     if (query.trim()) {
       const q = query.toLowerCase()
       rows = rows.filter(
@@ -203,6 +204,7 @@ export function Transactions() {
           className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)]"
         >
           <option value="all">All categories</option>
+          <option value={UNCATEGORIZED.id}>Uncategorized</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}

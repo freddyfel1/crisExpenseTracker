@@ -17,3 +17,7 @@ web-build/
 # OS / editor
 .DS_Store
 *.log
+
+# Personal/sensitive files that shouldn't be tracked
+Chase3050_Activity_20260904.csv
+Plaid recovery code.docx
