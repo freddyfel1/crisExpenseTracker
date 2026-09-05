@@ -282,9 +282,33 @@ function detectDayFirst(lines: string[], delimiter: string, dateCol: number): bo
   return false
 }
 
-const TRANSFER_TYPES = new Set(['ACCT_XFER'])
+const TRANSFER_TYPES = new Set(['ACCT_XFER', 'TRANSFER'])
 const DEBIT_INDICATORS = new Set(['DEBIT', 'WITHDRAWAL', 'DR'])
 const CREDIT_INDICATORS = new Set(['CREDIT', 'DEPOSIT', 'CR'])
+
+// When a single Amount column holds only positive numbers, some banks put the
+// sign information in a separate label column instead — but name it inconsistently
+// (a column literally named "Debit" containing the text "Debit"/"Credit" per row,
+// rather than a debit amount). Column-name matching alone misses this, so this
+// scans every other column's actual values: whichever one consists entirely of
+// DEBIT_INDICATORS/CREDIT_INDICATORS values (checked against a sample of rows) is
+// almost certainly the real sign indicator, whatever it's called.
+function findIndicatorColumn(lines: string[], delimiter: string, columnCount: number, excludeCols: number[]): number {
+  const sampleSize = Math.min(lines.length - 1, 30)
+  for (let col = 0; col < columnCount; col++) {
+    if (excludeCols.includes(col)) continue
+    let seen = 0
+    let matched = 0
+    for (let i = 1; i <= sampleSize; i++) {
+      const value = splitLine(lines[i], delimiter)[col]?.trim().toUpperCase()
+      if (!value) continue
+      seen++
+      if (DEBIT_INDICATORS.has(value) || CREDIT_INDICATORS.has(value)) matched++
+    }
+    if (seen > 0 && matched === seen) return col
+  }
+  return -1
+}
 
 export function parseBankCsv(text: string, manualMapping?: ManualColumnMapping): ParseCsvResult {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
@@ -332,6 +356,8 @@ export function parseBankCsv(text: string, manualMapping?: ManualColumnMapping):
   }
 
   const dayFirst = detectDayFirst(lines, delimiter, dateCol)
+  const indicatorCol =
+    amountCol !== -1 ? findIndicatorColumn(lines, delimiter, header.length, [dateCol, descCol, amountCol]) : -1
   const rows: ParsedCsvRow[] = []
   let creditCount = 0
   let skippedCount = 0
@@ -368,9 +394,9 @@ export function parseBankCsv(text: string, manualMapping?: ManualColumnMapping):
         skippedCount++
         continue
       }
-      const indicator = (detailsCol !== -1 ? fields[detailsCol] : typeCol !== -1 ? fields[typeCol] : '')
-        ?.toUpperCase()
-        .trim()
+      const indicatorSource =
+        indicatorCol !== -1 ? fields[indicatorCol] : detailsCol !== -1 ? fields[detailsCol] : typeCol !== -1 ? fields[typeCol] : ''
+      const indicator = indicatorSource?.toUpperCase().trim()
       if (indicator && DEBIT_INDICATORS.has(indicator)) isDebit = true
       else if (indicator && CREDIT_INDICATORS.has(indicator)) isDebit = false
       else isDebit = rawAmount < 0
