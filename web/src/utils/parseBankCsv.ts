@@ -99,6 +99,7 @@ export function parseBankCsv(text: string): ParseCsvResult {
   const descCol = findColumn(header, ['description', 'merchant', 'payee'])
   const amountCol = findColumn(header, ['amount'])
   const typeCol = findColumn(header, ['type'])
+  const categoryCol = findColumn(header, ['category'])
   const detailsCol = findColumn(header, [
     'details',
     'credit debit indicator',
@@ -139,12 +140,15 @@ export function parseBankCsv(text: string): ParseCsvResult {
     }
 
     const type = typeCol !== -1 ? fields[typeCol]?.toUpperCase() : ''
+    // Some exports (this bank's included) categorize the transaction themselves and
+    // already call out self-transfers by name — trust that over guessing from free text.
+    const category = categoryCol !== -1 ? fields[categoryCol] : ''
     rows.push({
       date: isoDate,
       merchant: description,
       amount: Math.abs(rawAmount),
       paymentMethod: type || null,
-      isLikelyTransfer: TRANSFER_TYPES.has(type ?? ''),
+      isLikelyTransfer: TRANSFER_TYPES.has(type ?? '') || /transfer/i.test(category ?? ''),
     })
   }
 
