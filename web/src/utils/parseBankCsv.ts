@@ -79,6 +79,17 @@ function toIsoDate(value: string): string | null {
 
 const TRANSFER_TYPES = new Set(['ACCT_XFER'])
 
+// Different banks spell the debit/credit indicator differently: Chase uses a
+// "Details" column with literal "DEBIT"/"CREDIT"; ISO 20022-style exports (seen from
+// at least one card issuer) use "Credit Debit Indicator" with "DBIT"/"CRDT". Returns
+// null for an unrecognized value so the caller can fall back to the amount's sign.
+function isDebitIndicator(raw: string): boolean | null {
+  const value = raw.toUpperCase().trim()
+  if (value === 'DEBIT' || value === 'DBIT' || value === 'DR' || value === 'D') return true
+  if (value === 'CREDIT' || value === 'CRDT' || value === 'CR' || value === 'C') return false
+  return null
+}
+
 export function parseBankCsv(text: string): ParseCsvResult {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
   if (lines.length < 2) return { rows: [], creditCount: 0, skippedCount: 0 }
@@ -88,7 +99,12 @@ export function parseBankCsv(text: string): ParseCsvResult {
   const descCol = findColumn(header, ['description', 'merchant', 'payee'])
   const amountCol = findColumn(header, ['amount'])
   const typeCol = findColumn(header, ['type'])
-  const detailsCol = findColumn(header, ['details'])
+  const detailsCol = findColumn(header, [
+    'details',
+    'credit debit indicator',
+    'debit credit indicator',
+    'credit/debit indicator',
+  ])
 
   if (dateCol === -1 || descCol === -1 || amountCol === -1) {
     return { rows: [], creditCount: 0, skippedCount: lines.length - 1 }
@@ -103,16 +119,18 @@ export function parseBankCsv(text: string): ParseCsvResult {
     const rawAmount = Number(fields[amountCol]?.replace(/[^0-9.-]/g, ''))
     const isoDate = toIsoDate(fields[dateCol] ?? '')
     const description = fields[descCol]?.replace(/\s+/g, ' ').trim()
-    const details = detailsCol !== -1 ? fields[detailsCol]?.toUpperCase() : null
+    const indicatorRaw = detailsCol !== -1 ? fields[detailsCol] : null
 
     if (!isoDate || !description || Number.isNaN(rawAmount)) {
       skippedCount++
       continue
     }
 
-    // A row counts as a debit (money out) when the Details column says so, or
-    // when there's no Details column at all, when the amount itself is negative.
-    const isDebit = details ? details === 'DEBIT' : rawAmount < 0
+    // A row counts as a debit (money out) when the indicator column says so — covering
+    // both Chase's "DEBIT"/"CREDIT" and ISO 20022-style "DBIT"/"CRDT" exports. If there's
+    // no such column, or its value isn't recognized, fall back to the amount's sign.
+    const indicatorResult = indicatorRaw ? isDebitIndicator(indicatorRaw) : null
+    const isDebit = indicatorResult !== null ? indicatorResult : rawAmount < 0
     if (!isDebit) {
       creditCount++
       continue
