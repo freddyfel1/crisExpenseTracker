@@ -104,6 +104,8 @@ export function parseBankCsv(text: string): ParseCsvResult {
     'credit debit indicator',
     'debit credit indicator',
     'credit/debit indicator',
+    'debit',
+    'credit',
   ])
 
   if (dateCol === -1 || descCol === -1 || amountCol === -1) {
