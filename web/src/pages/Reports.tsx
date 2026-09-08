@@ -106,6 +106,17 @@ export function Reports() {
     return [...totals.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 8)
   }, [periodTransactions])
 
+  // Every category present in the period, unlike the chart's top-5 cap —
+  // this feeds the PDF's category breakdown table.
+  const categoryBreakdown = useMemo(() => {
+    const totals = new Map<string, number>()
+    for (const t of periodTransactions) {
+      const key = categoryKey(t.categoryId)
+      totals.set(key, (totals.get(key) ?? 0) + t.amount)
+    }
+    return [...totals.entries()].sort((a, b) => b[1] - a[1])
+  }, [periodTransactions])
+
   const periodLabel =
     monthFilter === 'all' ? yearFilter : `${MONTH_NAMES[Number(monthFilter) - 1]} ${yearFilter}`
 
@@ -170,6 +181,21 @@ export function Reports() {
         margin: { left: margin, right: margin },
         head: [['Merchant', 'Transactions', 'Total']],
         body: topMerchants.map(([merchant, { total, count }]) => [merchant, String(count), formatMoney(total)]),
+        headStyles: { fillColor: [31, 41, 55] },
+        styles: { fontSize: 10 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+      })
+
+      const afterMerchantsY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+      autoTable(doc, {
+        startY: afterMerchantsY + 24,
+        margin: { left: margin, right: margin },
+        head: [['Category', 'Total', '% of spend']],
+        body: categoryBreakdown.map(([catKey, total]) => [
+          byIdCat(catKey).name,
+          formatMoney(total),
+          totalSpent > 0 ? `${Math.round((total / totalSpent) * 100)}%` : '0%',
+        ]),
         headStyles: { fillColor: [31, 41, 55] },
         styles: { fontSize: 10 },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
