@@ -49,3 +49,28 @@ export interface BudgetLineItem {
   remarks: string | null
   sortOrder: number
 }
+
+export type InvestmentAccountType = 'brokerage' | 'crypto' | 'retirement' | 'other'
+
+export interface InvestmentAccount {
+  id: string
+  name: string
+  institution: string | null
+  accountType: InvestmentAccountType
+}
+
+export type AssetType = 'etf' | 'stock' | 'crypto' | 'other'
+export type InvestmentTransactionType = 'buy' | 'sell' | 'dividend'
+
+export interface InvestmentTransaction {
+  id: string
+  accountId: string
+  symbol: string
+  assetType: AssetType
+  transactionType: InvestmentTransactionType
+  quantity: number
+  pricePerUnit: number
+  fees: number
+  date: string // ISO date
+  notes: string | null
+}

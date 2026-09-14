@@ -2,18 +2,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteBudgetLineItem,
   deleteBudgetSection,
+  deleteInvestmentAccount,
+  deleteInvestmentTransaction,
   deleteTransaction,
   fetchBudgetLineItems,
   fetchBudgetSections,
   fetchCategories,
+  fetchInvestmentAccounts,
+  fetchInvestmentTransactions,
   fetchProfile,
   fetchTransactions,
   updateProfile,
   upsertBudgetLineItem,
   upsertBudgetSection,
+  upsertInvestmentAccount,
+  upsertInvestmentTransaction,
   upsertTransaction,
 } from '../data/api'
-import type { BudgetLineItem, BudgetSection, Profile, Transaction } from '../types'
+import type { BudgetLineItem, BudgetSection, InvestmentAccount, InvestmentTransaction, Profile, Transaction } from '../types'
 import { useSession } from './useSession'
 
 export function useTransactions() {
@@ -125,5 +131,63 @@ export function useDeleteBudgetLineItem() {
   return useMutation({
     mutationFn: (id: string) => deleteBudgetLineItem(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['budgetLineItems', session?.user.id] }),
+  })
+}
+
+export function useInvestmentAccounts() {
+  const { session } = useSession()
+  return useQuery({
+    queryKey: ['investmentAccounts', session?.user.id],
+    queryFn: fetchInvestmentAccounts,
+    enabled: Boolean(session),
+  })
+}
+
+export function useSaveInvestmentAccount() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (a: Partial<InvestmentAccount> & { id: string }) => upsertInvestmentAccount(session!.user.id, a),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['investmentAccounts', session?.user.id] }),
+  })
+}
+
+export function useDeleteInvestmentAccount() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteInvestmentAccount(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investmentAccounts', session?.user.id] })
+      queryClient.invalidateQueries({ queryKey: ['investmentTransactions', session?.user.id] })
+    },
+  })
+}
+
+export function useInvestmentTransactions() {
+  const { session } = useSession()
+  return useQuery({
+    queryKey: ['investmentTransactions', session?.user.id],
+    queryFn: fetchInvestmentTransactions,
+    enabled: Boolean(session),
+  })
+}
+
+export function useSaveInvestmentTransaction() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (t: Partial<InvestmentTransaction> & { id: string; accountId: string }) =>
+      upsertInvestmentTransaction(session!.user.id, t),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['investmentTransactions', session?.user.id] }),
+  })
+}
+
+export function useDeleteInvestmentTransaction() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteInvestmentTransaction(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['investmentTransactions', session?.user.id] }),
   })
 }
