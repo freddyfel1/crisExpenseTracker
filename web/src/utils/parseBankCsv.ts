@@ -128,7 +128,8 @@ const AMOUNT_CANDIDATES = ['amount', 'transaction amount', 'value']
 const DEBIT_CANDIDATES = ['debit', 'withdrawal', 'debit amount', 'money out', 'paid out', 'withdrawals']
 const CREDIT_CANDIDATES = ['credit', 'deposit', 'credit amount', 'money in', 'paid in', 'deposits']
 const TYPE_CANDIDATES = ['type', 'transaction type', 'category']
-const DETAILS_CANDIDATES = ['details']
+const CATEGORY_CANDIDATES = ['category']
+const DETAILS_CANDIDATES = ['details', 'credit debit indicator', 'debit credit indicator', 'credit/debit indicator']
 
 const MONTHS: Record<string, number> = {
   jan: 1,
@@ -283,8 +284,11 @@ function detectDayFirst(lines: string[], delimiter: string, dateCol: number): bo
 }
 
 const TRANSFER_TYPES = new Set(['ACCT_XFER', 'TRANSFER'])
-const DEBIT_INDICATORS = new Set(['DEBIT', 'WITHDRAWAL', 'DR'])
-const CREDIT_INDICATORS = new Set(['CREDIT', 'DEPOSIT', 'CR'])
+// Covers both plain-English indicators ("DEBIT"/"CREDIT"/"DR"/"CR") and
+// ISO 20022-style exports, which spell them "DBIT"/"CRDT" or abbreviate to a
+// bare "D"/"C".
+const DEBIT_INDICATORS = new Set(['DEBIT', 'WITHDRAWAL', 'DR', 'DBIT', 'D'])
+const CREDIT_INDICATORS = new Set(['CREDIT', 'DEPOSIT', 'CR', 'CRDT', 'C'])
 
 // When a single Amount column holds only positive numbers, some banks put the
 // sign information in a separate label column instead — but name it inconsistently
@@ -323,6 +327,7 @@ export function parseBankCsv(text: string, manualMapping?: ManualColumnMapping):
   let debitCol: number
   let creditCol: number
   let typeCol: number
+  let categoryCol: number
   let detailsCol: number
 
   if (manualMapping) {
@@ -332,6 +337,7 @@ export function parseBankCsv(text: string, manualMapping?: ManualColumnMapping):
     debitCol = manualMapping.debitCol ?? -1
     creditCol = manualMapping.creditCol ?? -1
     typeCol = manualMapping.typeCol ?? -1
+    categoryCol = -1
     detailsCol = manualMapping.detailsCol ?? -1
   } else {
     dateCol = findColumn(header, DATE_CANDIDATES)
@@ -340,6 +346,7 @@ export function parseBankCsv(text: string, manualMapping?: ManualColumnMapping):
     debitCol = findColumn(header, DEBIT_CANDIDATES)
     creditCol = findColumn(header, CREDIT_CANDIDATES)
     typeCol = findColumn(header, TYPE_CANDIDATES)
+    categoryCol = findColumn(header, CATEGORY_CANDIDATES)
     detailsCol = findColumn(header, DETAILS_CANDIDATES)
 
     // Amount and debit/credit candidates can collide (e.g. a "Credit" header also
@@ -408,12 +415,15 @@ export function parseBankCsv(text: string, manualMapping?: ManualColumnMapping):
     }
 
     const type = typeCol !== -1 ? fields[typeCol]?.toUpperCase().trim() : ''
+    // Some exports categorize the transaction themselves and already call out
+    // self-transfers by name — trust that over guessing from free text alone.
+    const category = categoryCol !== -1 ? fields[categoryCol] : ''
     rows.push({
       date: isoDate,
       merchant: description,
       amount: Math.abs(rawAmount),
       paymentMethod: type || null,
-      isLikelyTransfer: TRANSFER_TYPES.has(type ?? ''),
+      isLikelyTransfer: TRANSFER_TYPES.has(type ?? '') || /transfer/i.test(category ?? ''),
     })
   }
 

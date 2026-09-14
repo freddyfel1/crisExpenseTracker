@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { Download, FileText } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Legend, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useStore } from '../data/store'
 import { formatMoney, monthKey } from '../utils/format'
@@ -46,6 +46,8 @@ function downloadCsv(rows: string[][], filename: string) {
 export function Reports() {
   const { transactions, categories } = useStore()
   const currentYear = String(new Date().getFullYear())
+  const chartCardRef = useRef<HTMLDivElement>(null)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const years = useMemo(() => {
     const set = new Set(transactions.map((t) => monthKey(t.date).slice(0, 4)))
@@ -104,6 +106,17 @@ export function Reports() {
     return [...totals.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 8)
   }, [periodTransactions])
 
+  // Every category present in the period, unlike the chart's top-5 cap —
+  // this feeds the PDF's category breakdown table.
+  const categoryBreakdown = useMemo(() => {
+    const totals = new Map<string, number>()
+    for (const t of periodTransactions) {
+      const key = categoryKey(t.categoryId)
+      totals.set(key, (totals.get(key) ?? 0) + t.amount)
+    }
+    return [...totals.entries()].sort((a, b) => b[1] - a[1])
+  }, [periodTransactions])
+
   const periodLabel =
     monthFilter === 'all' ? yearFilter : `${MONTH_NAMES[Number(monthFilter) - 1]} ${yearFilter}`
 
@@ -121,6 +134,78 @@ export function Reports() {
     ]
     const suffix = monthFilter === 'all' ? yearFilter : `${yearFilter}-${monthFilter}`
     downloadCsv(rows, `crisexpensetracker_transactions_${suffix}.csv`)
+  }
+
+  // A printable one-pager: the actual rendered category chart (captured as an
+  // image, since it's an SVG chart) plus a top-merchants table, bundled as a
+  // real PDF file rather than the CSV's plain row dump.
+  const exportPdf = async () => {
+    if (!chartCardRef.current) return
+    setIsExportingPdf(true)
+    try {
+      const [{ jsPDF }, { default: html2canvas }, { autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+        import('jspdf-autotable'),
+      ])
+
+      const canvas = await html2canvas(chartCardRef.current, { scale: 2, backgroundColor: '#ffffff' })
+      const chartImage = canvas.toDataURL('image/png')
+
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const margin = 40
+
+      doc.setFontSize(18)
+      doc.text('CrisExpenseTracker', margin, 48)
+      doc.setFontSize(12)
+      doc.setTextColor(110)
+      doc.text(`Spending report — ${periodLabel}`, margin, 68)
+
+      const totalSpent = periodTransactions.reduce((sum, t) => sum + t.amount, 0)
+      doc.setFontSize(11)
+      doc.setTextColor(20)
+      doc.text(
+        `Total spent: ${formatMoney(totalSpent)}  •  ${periodTransactions.length} transaction${periodTransactions.length === 1 ? '' : 's'}`,
+        margin,
+        88,
+      )
+
+      const imgWidth = pageWidth - margin * 2
+      const imgHeight = (canvas.height / canvas.width) * imgWidth
+      const chartTop = 106
+      doc.addImage(chartImage, 'PNG', margin, chartTop, imgWidth, imgHeight)
+
+      autoTable(doc, {
+        startY: chartTop + imgHeight + 24,
+        margin: { left: margin, right: margin },
+        head: [['Merchant', 'Transactions', 'Total']],
+        body: topMerchants.map(([merchant, { total, count }]) => [merchant, String(count), formatMoney(total)]),
+        headStyles: { fillColor: [31, 41, 55] },
+        styles: { fontSize: 10 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+      })
+
+      const afterMerchantsY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+      autoTable(doc, {
+        startY: afterMerchantsY + 24,
+        margin: { left: margin, right: margin },
+        head: [['Category', 'Total', '% of spend']],
+        body: categoryBreakdown.map(([catKey, total]) => [
+          byIdCat(catKey).name,
+          formatMoney(total),
+          totalSpent > 0 ? `${Math.round((total / totalSpent) * 100)}%` : '0%',
+        ]),
+        headStyles: { fillColor: [31, 41, 55] },
+        styles: { fontSize: 10 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+      })
+
+      const suffix = monthFilter === 'all' ? yearFilter : `${yearFilter}-${monthFilter}`
+      doc.save(`crisexpensetracker_report_${suffix}.pdf`)
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
   return (
@@ -163,10 +248,17 @@ export function Reports() {
           >
             <Download size={15} /> Export CSV
           </button>
+          <button
+            onClick={exportPdf}
+            disabled={isExportingPdf}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-60"
+          >
+            <FileText size={15} /> {isExportingPdf ? 'Preparing PDF…' : 'Export PDF report'}
+          </button>
         </div>
       </div>
 
-      <Card title={`Top categories, ${periodLabel}`}>
+      <Card ref={chartCardRef} title={`Top categories, ${periodLabel}`}>
         <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
