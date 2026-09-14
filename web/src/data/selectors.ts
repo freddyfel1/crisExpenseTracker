@@ -1,4 +1,4 @@
-import type { MonthlyIncome, Transaction } from '../types'
+import type { AssetType, InvestmentTransaction, MonthlyIncome, Transaction } from '../types'
 import { monthKey } from '../utils/format'
 
 export const transactionsForMonth = (transactions: Transaction[], month: string): Transaction[] =>
@@ -91,6 +91,60 @@ export const incomeForMonth = (entries: MonthlyIncome[], month: string): number 
 
 export const totalIncomeForMonths = (entries: MonthlyIncome[], months: string[]): number =>
   months.reduce((sum, m) => sum + incomeForMonth(entries, m), 0)
+
+export interface Holding {
+  symbol: string
+  assetType: AssetType
+  quantity: number
+  avgCost: number
+  costBasis: number
+  dividends: number
+}
+
+// Holdings aren't stored — they're derived from the buy/sell/dividend log, the
+// same way category totals are derived from `transactions`. Average cost uses
+// all buys ever made (not just the ones still held), which is a simplification
+// but keeps a sale from needing to pick which specific lot it closed out.
+export const holdingsForAccount = (transactions: InvestmentTransaction[], accountId: string): Holding[] => {
+  const bySymbol = new Map<
+    string,
+    { assetType: AssetType; buyQty: number; buyCost: number; sellQty: number; dividends: number }
+  >()
+  for (const t of transactions) {
+    if (t.accountId !== accountId) continue
+    const entry = bySymbol.get(t.symbol) ?? { assetType: t.assetType, buyQty: 0, buyCost: 0, sellQty: 0, dividends: 0 }
+    if (t.transactionType === 'buy') {
+      entry.buyQty += t.quantity
+      entry.buyCost += t.quantity * t.pricePerUnit + t.fees
+    } else if (t.transactionType === 'sell') {
+      entry.sellQty += t.quantity
+    } else {
+      entry.dividends += t.quantity * t.pricePerUnit
+    }
+    bySymbol.set(t.symbol, entry)
+  }
+  return [...bySymbol.entries()]
+    .map(([symbol, e]) => {
+      const quantity = e.buyQty - e.sellQty
+      const avgCost = e.buyQty > 0 ? e.buyCost / e.buyQty : 0
+      return {
+        symbol,
+        assetType: e.assetType,
+        quantity,
+        avgCost,
+        costBasis: quantity * avgCost,
+        dividends: e.dividends,
+      }
+    })
+    .filter((h) => h.quantity > 0 || h.dividends > 0)
+    .sort((a, b) => b.costBasis - a.costBasis)
+}
+
+export const totalInvested = (transactions: InvestmentTransaction[], accountIds: string[]): number =>
+  accountIds.reduce(
+    (sum, id) => sum + holdingsForAccount(transactions, id).reduce((s, h) => s + h.costBasis, 0),
+    0,
+  )
 
 export const spendTrend = (transactions: Transaction[], monthsBack: number) => {
   const now = new Date()

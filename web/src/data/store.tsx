@@ -3,12 +3,16 @@ import {
   deleteBudgetLineItem as apiDeleteBudgetLineItem,
   deleteBudgetSection as apiDeleteBudgetSection,
   deleteCategory as apiDeleteCategory,
+  deleteInvestmentAccount as apiDeleteInvestmentAccount,
+  deleteInvestmentTransaction as apiDeleteInvestmentTransaction,
   deleteSavingsGoal as apiDeleteSavingsGoal,
   deleteTransaction as apiDeleteTransaction,
   duplicateBudgetMonth as apiDuplicateBudgetMonth,
   fetchBudgetLineItems,
   fetchBudgetSections,
   fetchCategories,
+  fetchInvestmentAccounts,
+  fetchInvestmentTransactions,
   fetchMonthlyIncome,
   fetchProfile,
   fetchSavingsGoals,
@@ -18,12 +22,24 @@ import {
   upsertBudgetLineItem,
   upsertBudgetSection,
   upsertCategory,
+  upsertInvestmentAccount,
+  upsertInvestmentTransaction,
   upsertMonthlyIncome,
   upsertSavingsGoal,
   upsertTransaction,
 } from './api'
 import type { ImportableTransaction } from './api'
-import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, SavingsGoal, Transaction } from '../types'
+import type {
+  BudgetLineItem,
+  BudgetSection,
+  Category,
+  InvestmentAccount,
+  InvestmentTransaction,
+  MonthlyIncome,
+  Profile,
+  SavingsGoal,
+  Transaction,
+} from '../types'
 import { useSession } from '../hooks/useSession'
 
 // A thin wrapper over TanStack Query so every page can keep reading
@@ -67,6 +83,16 @@ export function useStore() {
   const savingsGoalsQuery = useQuery({
     queryKey: ['savingsGoals', userId],
     queryFn: fetchSavingsGoals,
+    enabled: Boolean(userId),
+  })
+  const investmentAccountsQuery = useQuery({
+    queryKey: ['investmentAccounts', userId],
+    queryFn: fetchInvestmentAccounts,
+    enabled: Boolean(userId),
+  })
+  const investmentTransactionsQuery = useQuery({
+    queryKey: ['investmentTransactions', userId],
+    queryFn: fetchInvestmentTransactions,
     enabled: Boolean(userId),
   })
 
@@ -129,6 +155,26 @@ export function useStore() {
     mutationFn: (id: string) => apiDeleteSavingsGoal(id),
     onSuccess: () => invalidate('savingsGoals'),
   })
+  const saveInvestmentAccount = useMutation({
+    mutationFn: (a: Partial<InvestmentAccount> & { id?: string }) => upsertInvestmentAccount(userId!, a),
+    onSuccess: () => invalidate('investmentAccounts'),
+  })
+  const removeInvestmentAccount = useMutation({
+    mutationFn: (id: string) => apiDeleteInvestmentAccount(id),
+    onSuccess: () => {
+      invalidate('investmentAccounts')
+      invalidate('investmentTransactions')
+    },
+  })
+  const saveInvestmentTransaction = useMutation({
+    mutationFn: (t: Partial<InvestmentTransaction> & { id?: string; accountId: string }) =>
+      upsertInvestmentTransaction(userId!, t),
+    onSuccess: () => invalidate('investmentTransactions'),
+  })
+  const removeInvestmentTransaction = useMutation({
+    mutationFn: (id: string) => apiDeleteInvestmentTransaction(id),
+    onSuccess: () => invalidate('investmentTransactions'),
+  })
   const duplicateBudgetMonth = useMutation({
     mutationFn: ({ fromSections, fromItemsBySection, toMonthKey }: {
       fromSections: BudgetSection[]
@@ -149,6 +195,8 @@ export function useStore() {
     budgetLineItems: budgetLineItemsQuery.data ?? ([] as BudgetLineItem[]),
     monthlyIncomes: monthlyIncomeQuery.data ?? ([] as MonthlyIncome[]),
     savingsGoals: savingsGoalsQuery.data ?? ([] as SavingsGoal[]),
+    investmentAccounts: investmentAccountsQuery.data ?? ([] as InvestmentAccount[]),
+    investmentTransactions: investmentTransactionsQuery.data ?? ([] as InvestmentTransaction[]),
     isLoading: transactionsQuery.isLoading || categoriesQuery.isLoading,
 
     addTransaction: (t: Transaction) => saveTransaction.mutate(t),
@@ -183,5 +231,11 @@ export function useStore() {
 
     saveSavingsGoal: (g: Partial<SavingsGoal> & { id?: string }) => saveSavingsGoal.mutate(g),
     deleteSavingsGoal: (id: string) => removeSavingsGoal.mutate(id),
+
+    saveInvestmentAccount: (a: Partial<InvestmentAccount> & { id?: string }) => saveInvestmentAccount.mutate(a),
+    deleteInvestmentAccount: (id: string) => removeInvestmentAccount.mutate(id),
+    saveInvestmentTransaction: (t: Partial<InvestmentTransaction> & { id?: string; accountId: string }) =>
+      saveInvestmentTransaction.mutate(t),
+    deleteInvestmentTransaction: (id: string) => removeInvestmentTransaction.mutate(id),
   }
 }

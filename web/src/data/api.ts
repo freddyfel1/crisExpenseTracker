@@ -1,5 +1,15 @@
 import { supabase } from '../lib/supabase'
-import type { BudgetLineItem, BudgetSection, Category, MonthlyIncome, Profile, SavingsGoal, Transaction } from '../types'
+import type {
+  BudgetLineItem,
+  BudgetSection,
+  Category,
+  InvestmentAccount,
+  InvestmentTransaction,
+  MonthlyIncome,
+  Profile,
+  SavingsGoal,
+  Transaction,
+} from '../types'
 import { currentMonthKey } from '../utils/format'
 
 type TransactionRow = {
@@ -332,6 +342,103 @@ export async function upsertSavingsGoal(userId: string, g: Partial<SavingsGoal> 
 
 export async function deleteSavingsGoal(id: string) {
   const { error } = await supabase.from('savings_goals').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchInvestmentAccounts(): Promise<InvestmentAccount[]> {
+  const { data, error } = await supabase.from('investment_accounts').select('*').order('name')
+  if (error) throw error
+  return (
+    data as { id: string; name: string; institution: string | null; account_type: InvestmentAccount['accountType'] }[]
+  ).map((a) => ({
+    id: a.id,
+    name: a.name,
+    institution: a.institution,
+    accountType: a.account_type,
+  }))
+}
+
+export async function upsertInvestmentAccount(userId: string, a: Partial<InvestmentAccount> & { id?: string }) {
+  const { data, error } = await supabase
+    .from('investment_accounts')
+    .upsert({
+      id: a.id,
+      user_id: userId,
+      name: a.name,
+      institution: a.institution ?? null,
+      account_type: a.accountType ?? 'brokerage',
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return {
+    id: data.id,
+    name: data.name,
+    institution: data.institution,
+    accountType: data.account_type,
+  } as InvestmentAccount
+}
+
+export async function deleteInvestmentAccount(id: string) {
+  const { error } = await supabase.from('investment_accounts').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchInvestmentTransactions(): Promise<InvestmentTransaction[]> {
+  const { data, error } = await supabase
+    .from('investment_transactions')
+    .select('*')
+    .order('occurred_on', { ascending: false })
+  if (error) throw error
+  return (
+    data as {
+      id: string
+      account_id: string
+      symbol: string
+      asset_type: InvestmentTransaction['assetType']
+      transaction_type: InvestmentTransaction['transactionType']
+      quantity: number
+      price_per_unit: number
+      fees: number
+      occurred_on: string
+      notes: string | null
+    }[]
+  ).map((t) => ({
+    id: t.id,
+    accountId: t.account_id,
+    symbol: t.symbol,
+    assetType: t.asset_type,
+    transactionType: t.transaction_type,
+    quantity: Number(t.quantity),
+    pricePerUnit: Number(t.price_per_unit),
+    fees: Number(t.fees),
+    date: t.occurred_on,
+    notes: t.notes,
+  }))
+}
+
+export async function upsertInvestmentTransaction(
+  userId: string,
+  t: Partial<InvestmentTransaction> & { id?: string; accountId: string },
+) {
+  const { error } = await supabase.from('investment_transactions').upsert({
+    id: t.id,
+    user_id: userId,
+    account_id: t.accountId,
+    symbol: t.symbol,
+    asset_type: t.assetType ?? 'etf',
+    transaction_type: t.transactionType ?? 'buy',
+    quantity: t.quantity ?? 0,
+    price_per_unit: t.pricePerUnit ?? 0,
+    fees: t.fees ?? 0,
+    occurred_on: t.date,
+    notes: t.notes ?? null,
+  })
+  if (error) throw error
+}
+
+export async function deleteInvestmentTransaction(id: string) {
+  const { error } = await supabase.from('investment_transactions').delete().eq('id', id)
   if (error) throw error
 }
 
