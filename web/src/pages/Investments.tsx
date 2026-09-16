@@ -1,7 +1,11 @@
 import { useState } from 'react'
-import { Landmark, Layers, Pencil, Plus, TrendingUp, Trash2 } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { holdingsForAccount, totalInvested } from '../data/selectors'
+import { syncPlaidInvestments } from '../data/api'
+import { useSession } from '../hooks/useSession'
 import { formatDate, formatMoney } from '../utils/format'
 import { StatCard } from '../components/StatCard'
 import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction, InvestmentTransactionType } from '../types'
@@ -24,6 +28,7 @@ const TRANSACTION_TYPE_LABELS: Record<InvestmentTransactionType, string> = {
   buy: 'Buy',
   sell: 'Sell',
   dividend: 'Dividend',
+  other: 'Other',
 }
 
 function emptyAccount(): Partial<InvestmentAccount> {
@@ -53,6 +58,22 @@ export function Investments() {
     saveInvestmentTransaction,
     deleteInvestmentTransaction,
   } = useStore()
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+
+  const syncMutation = useMutation({
+    mutationFn: syncPlaidInvestments,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['investmentAccounts', session?.user.id] })
+      queryClient.invalidateQueries({ queryKey: ['investmentTransactions', session?.user.id] })
+      window.alert(
+        result.items === 0
+          ? 'No banks connected yet — connect one first.'
+          : `Synced ${result.accounts} account${result.accounts === 1 ? '' : 's'} and ${result.transactions} transaction${result.transactions === 1 ? '' : 's'}.`,
+      )
+    },
+    onError: (err) => window.alert(err instanceof Error ? err.message : 'Sync failed.'),
+  })
 
   const [editingAccount, setEditingAccount] = useState<Partial<InvestmentAccount> | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<
@@ -83,15 +104,28 @@ export function Investments() {
         <div>
           <h1 className="font-display text-[26px] text-[var(--ink)]">Investments</h1>
           <p className="text-[13px] text-[var(--text-soft)]">
-            ETFs, crypto, and other holdings you track by hand — separate from your everyday spending.
+            ETFs, crypto, and other holdings — log them by hand, or{' '}
+            <Link to="/transactions/connect-bank" className="font-medium text-[var(--primary)] hover:underline">
+              connect a bank
+            </Link>{' '}
+            that supports Plaid Investments to sync automatically.
           </p>
         </div>
-        <button
-          onClick={() => setEditingAccount(emptyAccount())}
-          className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
-        >
-          <Plus size={15} /> Add account
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)] disabled:opacity-60"
+          >
+            <RefreshCw size={15} /> {syncMutation.isPending ? 'Syncing…' : 'Sync from bank'}
+          </button>
+          <button
+            onClick={() => setEditingAccount(emptyAccount())}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
+          >
+            <Plus size={15} /> Add account
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

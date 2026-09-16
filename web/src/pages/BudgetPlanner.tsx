@@ -1,12 +1,48 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { GripVertical, Plus, Search, Trash2 } from 'lucide-react'
+import { FileText, GripVertical, Plus, Search, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { usePeriod } from '../data/period'
-import { monthlyIncomeEntryForMonth } from '../data/selectors'
-import { formatMoney } from '../utils/format'
+import { monthlyIncomeEntryForMonth, monthsUpTo } from '../data/selectors'
+import { formatMoney, monthKeyLabel } from '../utils/format'
 import { Card } from '../components/Card'
 import { MonthPicker } from '../components/MonthPicker'
-import type { BudgetLineItem, BudgetSection } from '../types'
+import type { BudgetLineItem, BudgetSection, MonthlyIncome } from '../types'
+
+const monthLabelShort = (key: string): string => {
+  const [y, m] = key.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+}
+
+interface BudgetStats {
+  income: number
+  expenses: number
+  savings: number
+  difference: number
+  balance: number
+}
+
+// Same computation the Summary card uses for the open month, generalized to any month so
+// the year-to-date export can total it across every month from January through the
+// selected one — a "savings" section is identified by name (see the app's own convention)
+// rather than a dedicated flag, so this has to repeat that lookup per month.
+function budgetStatsForMonth(
+  monthKey: string,
+  budgetSections: BudgetSection[],
+  itemsBySection: Map<string, BudgetLineItem[]>,
+  monthlyIncomes: MonthlyIncome[],
+): BudgetStats {
+  const sections = budgetSections.filter((s) => s.monthKey === monthKey)
+  const savingsSection = sections.find((s) => s.name.toLowerCase().includes('saving'))
+  const savings = (itemsBySection.get(savingsSection?.id ?? '') ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0)
+  const expenses = sections
+    .filter((s) => s.id !== savingsSection?.id)
+    .reduce((sum, s) => sum + (itemsBySection.get(s.id) ?? []).reduce((a, i) => a + i.monthlyAmount, 0), 0)
+  const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(monthlyIncomes, monthKey)
+  const income = monthlyIncome + otherIncome
+  const difference = income - expenses
+  const balance = difference - savings
+  return { income, expenses, savings, difference, balance }
+}
 
 export function BudgetPlanner() {
   const {
@@ -52,15 +88,156 @@ export function BudgetPlanner() {
     duplicateBudgetMonth(sourceSections, itemsBySection, month)
   }, [month, budgetSections, monthSections.length, itemsBySection, duplicateBudgetMonth])
 
-  const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(monthlyIncomes, month)
-  const income = monthlyIncome + otherIncome
-  const savingsSection = monthSections.find((s) => s.name.toLowerCase().includes('saving'))
-  const savings = (itemsBySection.get(savingsSection?.id ?? '') ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0)
-  const expenses = monthSections
-    .filter((s) => s.id !== savingsSection?.id)
-    .reduce((sum, s) => sum + (itemsBySection.get(s.id) ?? []).reduce((a, i) => a + i.monthlyAmount, 0), 0)
-  const difference = income - expenses
-  const balance = difference - savings
+  const { income, expenses, savings, difference, balance } = budgetStatsForMonth(
+    month,
+    budgetSections,
+    itemsBySection,
+    monthlyIncomes,
+  )
+
+  const [isExportingMonth, setIsExportingMonth] = useState(false)
+  const [isExportingYtd, setIsExportingYtd] = useState(false)
+
+  // Every section for the open month with its line items, unfiltered by the search box —
+  // the PDF is a full record of the plan, not just what's currently visible on screen.
+  const monthSectionsForExport = useMemo(
+    () =>
+      monthSections.map((section) => ({
+        section,
+        items: (itemsBySection.get(section.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
+      })),
+    [monthSections, itemsBySection],
+  )
+
+  const exportMonthPdf = async () => {
+    setIsExportingMonth(true)
+    try {
+      const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+      const margin = 40
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      doc.setFontSize(18)
+      doc.text('CrisExpenseTracker', margin, 48)
+      doc.setFontSize(12)
+      doc.setTextColor(110)
+      doc.text(`Budget Planner — ${monthKeyLabel(month)}`, margin, 68)
+
+      doc.setFontSize(11)
+      doc.setTextColor(20)
+      doc.text(
+        `Income ${formatMoney(income)}   Expenses ${formatMoney(expenses)}   Savings ${formatMoney(savings)}   Balance ${formatMoney(balance)}`,
+        margin,
+        88,
+      )
+
+      let y = 106
+      for (const { section, items } of monthSectionsForExport) {
+        if (y > pageHeight - 100) {
+          doc.addPage()
+          y = margin
+        }
+        const sectionTotal = items.reduce((sum, i) => sum + i.monthlyAmount, 0)
+        doc.setFontSize(12)
+        doc.setTextColor(20)
+        doc.text(section.name, margin, y)
+        doc.text(`${formatMoney(sectionTotal)}/mo`, pageWidth - margin, y, { align: 'right' })
+        y += 8
+
+        if (items.length > 0) {
+          autoTable(doc, {
+            startY: y,
+            margin: { left: margin, right: margin },
+            head: [['Name', 'Monthly', 'Yearly', 'Misc info', 'Remarks']],
+            body: items.map((i) => [
+              i.name,
+              formatMoney(i.monthlyAmount),
+              formatMoney(i.monthlyAmount * 12),
+              i.miscInfo ?? '',
+              i.remarks ?? '',
+            ]),
+            headStyles: { fillColor: [31, 41, 55] },
+            styles: { fontSize: 9 },
+            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+          })
+          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20
+        } else {
+          doc.setFontSize(10)
+          doc.setTextColor(140)
+          doc.text('No line items.', margin, y + 14)
+          y += 30
+        }
+      }
+
+      doc.save(`crisexpensetracker_budget_${month}.pdf`)
+    } finally {
+      setIsExportingMonth(false)
+    }
+  }
+
+  // Sums the same per-month stats used above across every month from January through the
+  // one currently open, so switching months changes how far the year-to-date total reaches
+  // — the same convention the Transactions page's own YTD stats already use.
+  const exportYtdPdf = async () => {
+    setIsExportingYtd(true)
+    try {
+      const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+      const margin = 40
+
+      const year = month.slice(0, 4)
+      const cutoffMonth = Number(month.slice(5, 7))
+      const ytdMonths = monthsUpTo(year, cutoffMonth)
+      const monthStats = ytdMonths.map((m) => ({
+        month: m,
+        ...budgetStatsForMonth(m, budgetSections, itemsBySection, monthlyIncomes),
+      }))
+      const totals = monthStats.reduce(
+        (acc, s) => ({
+          income: acc.income + s.income,
+          expenses: acc.expenses + s.expenses,
+          savings: acc.savings + s.savings,
+          balance: acc.balance + s.balance,
+        }),
+        { income: 0, expenses: 0, savings: 0, balance: 0 },
+      )
+
+      doc.setFontSize(18)
+      doc.text('CrisExpenseTracker', margin, 48)
+      doc.setFontSize(12)
+      doc.setTextColor(110)
+      doc.text(`Budget Planner — year to date, Jan–${monthLabelShort(month).split(' ')[0]} ${year}`, margin, 68)
+
+      autoTable(doc, {
+        startY: 90,
+        margin: { left: margin, right: margin },
+        head: [['Month', 'Income', 'Expenses', 'Savings', 'Balance']],
+        body: [
+          ...monthStats.map((s) => [
+            monthLabelShort(s.month),
+            formatMoney(s.income),
+            formatMoney(s.expenses),
+            formatMoney(s.savings),
+            formatMoney(s.balance),
+          ]),
+          ['Total', formatMoney(totals.income), formatMoney(totals.expenses), formatMoney(totals.savings), formatMoney(totals.balance)],
+        ],
+        headStyles: { fillColor: [31, 41, 55] },
+        styles: { fontSize: 10 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+        didParseCell: (data) => {
+          if (data.row.index === monthStats.length && data.section === 'body') {
+            data.cell.styles.fontStyle = 'bold'
+          }
+        },
+      })
+
+      doc.save(`crisexpensetracker_budget_ytd_${year}.pdf`)
+    } finally {
+      setIsExportingYtd(false)
+    }
+  }
 
   const q = query.trim().toLowerCase()
   const matchesQuery = (item: BudgetLineItem) =>
@@ -106,7 +283,23 @@ export function BudgetPlanner() {
             A planned monthly budget, organized into sections and line items — like a spreadsheet.
           </p>
         </div>
-        <MonthPicker />
+        <div className="flex flex-wrap items-center gap-2">
+          <MonthPicker />
+          <button
+            onClick={exportMonthPdf}
+            disabled={isExportingMonth}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)] disabled:opacity-60"
+          >
+            <FileText size={15} /> {isExportingMonth ? 'Preparing…' : 'Export month PDF'}
+          </button>
+          <button
+            onClick={exportYtdPdf}
+            disabled={isExportingYtd}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)] disabled:opacity-60"
+          >
+            <FileText size={15} /> {isExportingYtd ? 'Preparing…' : 'Export year to date'}
+          </button>
+        </div>
       </div>
 
       <div className="flex min-w-[220px] items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2">

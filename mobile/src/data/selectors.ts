@@ -53,9 +53,10 @@ export const holdingsForAccount = (transactions: InvestmentTransaction[], accoun
       entry.buyCost += t.quantity * t.pricePerUnit + t.fees
     } else if (t.transactionType === 'sell') {
       entry.sellQty += t.quantity
-    } else {
+    } else if (t.transactionType === 'dividend') {
       entry.dividends += t.quantity * t.pricePerUnit
     }
+    // 'other' (fees, transfers, cash deposits/withdrawals) doesn't affect holdings or dividends.
     bySymbol.set(t.symbol, entry)
   }
   return [...bySymbol.entries()]
