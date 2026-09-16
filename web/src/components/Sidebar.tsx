@@ -12,6 +12,7 @@ import {
   HelpCircle,
   Landmark,
   Upload,
+  TrendingUp,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { to: '/categories', label: 'Categories', icon: Tags },
   { to: '/budget-planner', label: 'Budget Planner', icon: FileSpreadsheet },
   { to: '/savings-goals', label: 'Savings Goals', icon: PiggyBank },
+  { to: '/investments', label: 'Investments', icon: TrendingUp },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
   { to: '/how-to', label: 'How To', icon: HelpCircle },

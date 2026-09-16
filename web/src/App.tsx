@@ -8,6 +8,7 @@ import { UploadTransactions } from './pages/UploadTransactions'
 import { Categories } from './pages/Categories'
 import { BudgetPlanner } from './pages/BudgetPlanner'
 import { SavingsGoals } from './pages/SavingsGoals'
+import { Investments } from './pages/Investments'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
 import { HowTo } from './pages/HowTo'
@@ -27,6 +28,7 @@ function App() {
             <Route path="/categories" element={<Categories />} />
             <Route path="/budget-planner" element={<BudgetPlanner />} />
             <Route path="/savings-goals" element={<SavingsGoals />} />
+            <Route path="/investments" element={<Investments />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/how-to" element={<HowTo />} />
