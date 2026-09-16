@@ -68,6 +68,9 @@ Deno.serve(async (req: Request) => {
       client_name: 'crisExpenseTracker',
       user: { client_user_id: user.id },
       products: ['transactions'],
+      // Optional, not required: Link still succeeds for institutions that don't support
+      // Investments, it just won't offer to include an investment account for those.
+      optional_products: ['investments'],
       country_codes: ['US'],
       language: 'en',
       ...(redirect_uri ? { redirect_uri } : {}),

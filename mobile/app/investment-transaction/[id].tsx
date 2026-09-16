@@ -21,6 +21,7 @@ const TRANSACTION_TYPES: { value: InvestmentTransactionType; label: string }[] =
   { value: 'buy', label: 'Buy' },
   { value: 'sell', label: 'Sell' },
   { value: 'dividend', label: 'Dividend' },
+  { value: 'other', label: 'Other' },
 ]
 
 export default function InvestmentTransactionDetail() {

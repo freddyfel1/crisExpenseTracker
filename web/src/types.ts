@@ -74,7 +74,7 @@ export interface InvestmentAccount {
 }
 
 export type AssetType = 'etf' | 'stock' | 'crypto' | 'other'
-export type InvestmentTransactionType = 'buy' | 'sell' | 'dividend'
+export type InvestmentTransactionType = 'buy' | 'sell' | 'dividend' | 'other'
 
 export interface InvestmentTransaction {
   id: string
