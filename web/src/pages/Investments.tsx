@@ -421,7 +421,7 @@ function AccountCard({
 }) {
   const holdings = holdingsForAccount(transactions, account.id)
   const accountCostBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
-  const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8)
+  const sortedTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
@@ -454,37 +454,8 @@ function AccountCard({
         </div>
       </div>
 
-      {holdings.length > 0 && (
-        <div className="mb-4 overflow-hidden rounded-lg border border-[var(--border-soft)]">
-          <table className="w-full text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-[var(--border-soft)] text-[11px] uppercase tracking-wide text-[var(--text-soft)]">
-                <th className="px-3 py-2 font-medium">Symbol</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 text-right font-medium">Quantity</th>
-                <th className="px-3 py-2 text-right font-medium">Avg cost</th>
-                <th className="px-3 py-2 text-right font-medium">Cost basis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {holdings.map((h) => (
-                <tr key={h.symbol} className="border-b border-[var(--border-soft)] last:border-0">
-                  <td className="px-3 py-2 font-medium text-[var(--ink)]">{h.symbol}</td>
-                  <td className="px-3 py-2 text-[var(--text-soft)]">{ASSET_TYPE_LABELS[h.assetType]}</td>
-                  <td className="px-3 py-2 text-right font-mono">{h.quantity}</td>
-                  <td className="px-3 py-2 text-right font-mono">{formatMoney(h.avgCost)}</td>
-                  <td className="px-3 py-2 text-right font-mono font-medium text-[var(--ink)]">
-                    {formatMoney(h.costBasis)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[12px] uppercase tracking-wide text-[var(--text-soft)]">Recent transactions</p>
+        <p className="text-[12px] uppercase tracking-wide text-[var(--text-soft)]">Transactions</p>
         <button
           onClick={onAddTransaction}
           className="flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--text-soft)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
@@ -493,38 +464,49 @@ function AccountCard({
         </button>
       </div>
 
-      {recent.length === 0 ? (
+      {sortedTransactions.length === 0 ? (
         <p className="text-[13px] text-[var(--text-soft)]">No transactions logged yet.</p>
       ) : (
-        <div className="space-y-1">
-          {recent.map((t) => (
-            <div
-              key={t.id}
-              className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-[13px] hover:bg-[var(--paper)]"
-            >
-              <div className="min-w-0 flex-1">
-                <span className="font-medium text-[var(--ink)]">{t.symbol}</span>{' '}
-                <span className="text-[var(--text-soft)]">
-                  {TRANSACTION_TYPE_LABELS[t.transactionType].toLowerCase()} {t.quantity} @ {formatMoney(t.pricePerUnit)}
-                </span>
-              </div>
-              <span className="text-[12px] text-[var(--text-soft)]">{formatDate(t.date)}</span>
-              <button
-                onClick={() => onEditTransaction(t)}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--text-soft)] hover:bg-[var(--surface)]"
-                aria-label="Edit transaction"
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                onClick={() => onDeleteTransaction(t.id)}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--warn)] hover:bg-[var(--warn-soft)]"
-                aria-label="Delete transaction"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
+        <div className="overflow-hidden rounded-lg border border-[var(--border-soft)]">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-[var(--border-soft)] text-[11px] uppercase tracking-wide text-[var(--text-soft)]">
+                <th className="px-3 py-2 font-medium">Symbol</th>
+                <th className="px-3 py-2 font-medium">Type</th>
+                <th className="px-3 py-2 text-right font-medium">QTY</th>
+                <th className="px-3 py-2 text-right font-medium">Buy Price</th>
+                <th className="px-3 py-2 font-medium">Buy date</th>
+                <th className="px-3 py-2 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTransactions.map((t) => (
+                <tr
+                  key={t.id}
+                  className="cursor-pointer border-b border-[var(--border-soft)] last:border-0 hover:bg-[var(--paper)]"
+                  onClick={() => onEditTransaction(t)}
+                >
+                  <td className="px-3 py-2 font-medium text-[var(--ink)]">{t.symbol}</td>
+                  <td className="px-3 py-2 text-[var(--text-soft)]">{ASSET_TYPE_LABELS[t.assetType]}</td>
+                  <td className="px-3 py-2 text-right font-mono">{t.quantity}</td>
+                  <td className="px-3 py-2 text-right font-mono">{formatMoney(t.pricePerUnit)}</td>
+                  <td className="px-3 py-2 text-[var(--text-soft)]">{formatDate(t.date)}</td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDeleteTransaction(t.id)
+                      }}
+                      className="grid h-7 w-7 place-items-center rounded-md text-[var(--warn)] hover:bg-[var(--warn-soft)]"
+                      aria-label="Delete transaction"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
