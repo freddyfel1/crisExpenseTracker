@@ -14,6 +14,8 @@ import {
   Upload,
   TrendingUp,
 } from 'lucide-react'
+import { useStore } from '../data/store'
+import { firstName } from '../utils/format'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -41,6 +43,8 @@ const DEFAULT_WIDTH = 240
 const STORAGE_KEY = 'sidebar-width'
 
 export function Sidebar() {
+  const { profile } = useStore()
+  const brandFirstName = firstName(profile?.name)
   const asideRef = useRef<HTMLElement>(null)
   const draggingRef = useRef(false)
   const [width, setWidth] = useState(() => {
@@ -90,7 +94,9 @@ export function Sidebar() {
           <Wallet size={18} />
         </div>
         <div>
-          <p className="font-display text-[17px] leading-tight text-[var(--ink)]">crisExpense</p>
+          <p className="font-display text-[17px] leading-tight text-[var(--ink)]">
+            {brandFirstName ? `${brandFirstName} Expense` : 'crisExpense'}
+          </p>
           <p className="text-[11px] uppercase tracking-wide text-[var(--text-soft)]">Tracker</p>
         </div>
       </div>

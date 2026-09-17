@@ -52,6 +52,8 @@ export default function InvestmentsScreen() {
   const txns = transactions.data ?? []
   const invested = totalInvested(txns, accountList.map((a) => a.id))
   const holdingCount = accountList.reduce((sum, a) => sum + holdingsForAccount(txns, a.id).length, 0)
+  const nonCryptoAccounts = accountList.filter((a) => a.accountType !== 'crypto')
+  const cryptoAccounts = accountList.filter((a) => a.accountType === 'crypto')
 
   const addAccount = () => {
     const id = uuidv4()
@@ -94,19 +96,47 @@ export default function InvestmentsScreen() {
           <Text style={styles.empty}>No investment accounts yet — add one to start logging buys and sells.</Text>
         )}
 
-        {accountList.map((account) => (
-          <AccountCard
-            key={account.id}
-            account={account}
-            transactions={txns.filter((t) => t.accountId === account.id)}
-            onEditAccount={() => router.push(`/investment-account/${account.id}`)}
-            onDeleteAccount={() =>
-              confirmDelete(`Delete "${account.name}" and all its transactions?`, () => deleteAccount.mutate(account.id))
-            }
-            onAddTransaction={() => addTransaction(account.id)}
-            onOpenTransaction={(t) => router.push(`/investment-transaction/${t.id}`)}
-          />
-        ))}
+        {nonCryptoAccounts.length > 0 && (
+          <View style={{ gap: 16 }}>
+            <Text style={styles.sectionLabel}>Stocks, ETFs & other</Text>
+            {nonCryptoAccounts.map((account) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                transactions={txns.filter((t) => t.accountId === account.id)}
+                onEditAccount={() => router.push(`/investment-account/${account.id}`)}
+                onDeleteAccount={() =>
+                  confirmDelete(`Delete "${account.name}" and all its transactions?`, () =>
+                    deleteAccount.mutate(account.id),
+                  )
+                }
+                onAddTransaction={() => addTransaction(account.id)}
+                onOpenTransaction={(t) => router.push(`/investment-transaction/${t.id}`)}
+              />
+            ))}
+          </View>
+        )}
+
+        {cryptoAccounts.length > 0 && (
+          <View style={{ gap: 16 }}>
+            <Text style={styles.sectionLabel}>Crypto</Text>
+            {cryptoAccounts.map((account) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                transactions={txns.filter((t) => t.accountId === account.id)}
+                onEditAccount={() => router.push(`/investment-account/${account.id}`)}
+                onDeleteAccount={() =>
+                  confirmDelete(`Delete "${account.name}" and all its transactions?`, () =>
+                    deleteAccount.mutate(account.id),
+                  )
+                }
+                onAddTransaction={() => addTransaction(account.id)}
+                onOpenTransaction={(t) => router.push(`/investment-transaction/${t.id}`)}
+              />
+            ))}
+          </View>
+        )}
 
         <Pressable style={styles.addAccountButton} onPress={addAccount}>
           <Plus size={15} color={colors.textSoft} />
@@ -202,6 +232,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
   subtitle: { fontSize: 13, color: colors.textSoft, marginTop: -8 },
   empty: { fontSize: 13, color: colors.textSoft },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSoft,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 12,
