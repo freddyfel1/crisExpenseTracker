@@ -86,6 +86,9 @@ export function Investments() {
     0,
   )
 
+  const cryptoAccounts = investmentAccounts.filter((a) => a.accountType === 'crypto')
+  const nonCryptoAccounts = investmentAccounts.filter((a) => a.accountType !== 'crypto')
+
   const saveAccount = () => {
     if (!editingAccount || !editingAccount.name?.trim()) return
     saveInvestmentAccount({ ...editingAccount, name: editingAccount.name.trim() })
@@ -153,25 +156,53 @@ export function Investments() {
         </p>
       )}
 
-      <div className="space-y-4">
-        {investmentAccounts.map((account) => (
-          <AccountCard
-            key={account.id}
-            account={account}
-            transactions={investmentTransactions.filter((t) => t.accountId === account.id)}
-            onEditAccount={() => setEditingAccount({ ...account })}
-            onDeleteAccount={() => {
-              if (window.confirm(`Delete "${account.name}" and all its transactions? This cannot be undone.`))
-                deleteInvestmentAccount(account.id)
-            }}
-            onAddTransaction={() => setEditingTransaction(emptyTransaction(account.id))}
-            onEditTransaction={(t) => setEditingTransaction({ ...t })}
-            onDeleteTransaction={(id) => {
-              if (window.confirm('Delete this transaction? This cannot be undone.')) deleteInvestmentTransaction(id)
-            }}
-          />
-        ))}
-      </div>
+      {nonCryptoAccounts.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">
+            Stocks, ETFs & other
+          </h2>
+          {nonCryptoAccounts.map((account) => (
+            <AccountCard
+              key={account.id}
+              account={account}
+              transactions={investmentTransactions.filter((t) => t.accountId === account.id)}
+              onEditAccount={() => setEditingAccount({ ...account })}
+              onDeleteAccount={() => {
+                if (window.confirm(`Delete "${account.name}" and all its transactions? This cannot be undone.`))
+                  deleteInvestmentAccount(account.id)
+              }}
+              onAddTransaction={() => setEditingTransaction(emptyTransaction(account.id))}
+              onEditTransaction={(t) => setEditingTransaction({ ...t })}
+              onDeleteTransaction={(id) => {
+                if (window.confirm('Delete this transaction? This cannot be undone.')) deleteInvestmentTransaction(id)
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {cryptoAccounts.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">Crypto</h2>
+          {cryptoAccounts.map((account) => (
+            <AccountCard
+              key={account.id}
+              account={account}
+              transactions={investmentTransactions.filter((t) => t.accountId === account.id)}
+              onEditAccount={() => setEditingAccount({ ...account })}
+              onDeleteAccount={() => {
+                if (window.confirm(`Delete "${account.name}" and all its transactions? This cannot be undone.`))
+                  deleteInvestmentAccount(account.id)
+              }}
+              onAddTransaction={() => setEditingTransaction(emptyTransaction(account.id))}
+              onEditTransaction={(t) => setEditingTransaction({ ...t })}
+              onDeleteTransaction={(id) => {
+                if (window.confirm('Delete this transaction? This cannot be undone.')) deleteInvestmentTransaction(id)
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {editingAccount && (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/30 p-4">
