@@ -189,6 +189,11 @@ export function BudgetPlanner() {
               3: { cellWidth: miscColWidth },
               4: { cellWidth: remarksColWidth },
             },
+            // columnStyles.halign only reaches body cells in this autoTable version —
+            // header cells stay left-positioned, so force it per cell regardless of section.
+            didParseCell: (data) => {
+              if (data.column.index === 1 || data.column.index === 2) data.cell.styles.halign = 'right'
+            },
           })
           y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20
         } else {
@@ -255,7 +260,10 @@ export function BudgetPlanner() {
         headStyles: { fillColor: [31, 41, 55] },
         styles: { fontSize: 10 },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+        // columnStyles.halign only reaches body cells in this autoTable version —
+        // header cells stay left-positioned, so force it per cell regardless of section.
         didParseCell: (data) => {
+          if (data.column.index >= 1) data.cell.styles.halign = 'right'
           if (data.row.index === monthStats.length && data.section === 'body') {
             data.cell.styles.fontStyle = 'bold'
           }
