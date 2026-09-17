@@ -118,6 +118,17 @@ export function BudgetPlanner() {
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
 
+      // Fixed so the section header's name/total line lands directly above the
+      // matching Name/Monthly columns in the table below it, instead of the
+      // total drifting to the page edge while the table stays narrower.
+      const tableWidth = pageWidth - margin * 2
+      const nameColWidth = tableWidth * 0.3
+      const monthlyColWidth = 65
+      const yearlyColWidth = 70
+      const miscColWidth = tableWidth * 0.16
+      const remarksColWidth = tableWidth - nameColWidth - monthlyColWidth - yearlyColWidth - miscColWidth
+      const monthlyColRight = margin + nameColWidth + monthlyColWidth
+
       doc.setFontSize(18)
       doc.text('CrisExpenseTracker', margin, 48)
       doc.setFontSize(12)
@@ -142,7 +153,7 @@ export function BudgetPlanner() {
         doc.setFontSize(12)
         doc.setTextColor(20)
         doc.text(section.name, margin, y)
-        doc.text(`${formatMoney(sectionTotal)}/mo`, pageWidth - margin, y, { align: 'right' })
+        doc.text(`${formatMoney(sectionTotal)}/mo`, monthlyColRight, y, { align: 'right' })
         y += 8
 
         if (items.length > 0) {
@@ -157,9 +168,16 @@ export function BudgetPlanner() {
               i.miscInfo ?? '',
               i.remarks ?? '',
             ]),
-            headStyles: { fillColor: [31, 41, 55] },
-            styles: { fontSize: 9 },
-            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+            theme: 'plain',
+            headStyles: { fillColor: [31, 41, 55], textColor: 255 },
+            styles: { fontSize: 9, lineWidth: { bottom: 0.5 }, lineColor: [210, 210, 210] },
+            columnStyles: {
+              0: { cellWidth: nameColWidth },
+              1: { cellWidth: monthlyColWidth, halign: 'right' },
+              2: { cellWidth: yearlyColWidth, halign: 'right' },
+              3: { cellWidth: miscColWidth },
+              4: { cellWidth: remarksColWidth },
+            },
           })
           y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20
         } else {
