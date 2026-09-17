@@ -189,6 +189,11 @@ export function Reports() {
         headStyles: { fillColor: [31, 41, 55] },
         styles: { fontSize: 10 },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+        // columnStyles.halign only reaches body cells in this autoTable version —
+        // header cells stay left-positioned, so force it per cell regardless of section.
+        didParseCell: (data) => {
+          if (data.column.index === 1 || data.column.index === 2) data.cell.styles.halign = 'right'
+        },
       })
 
       const afterMerchantsY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
@@ -204,6 +209,9 @@ export function Reports() {
         headStyles: { fillColor: [31, 41, 55] },
         styles: { fontSize: 10 },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+        didParseCell: (data) => {
+          if (data.column.index === 1 || data.column.index === 2) data.cell.styles.halign = 'right'
+        },
       })
 
       const suffix = monthFilter === 'all' ? yearFilter : `${yearFilter}-${monthFilter}`
