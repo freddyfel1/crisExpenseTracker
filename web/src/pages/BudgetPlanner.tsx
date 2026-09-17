@@ -128,6 +128,7 @@ export function BudgetPlanner() {
       const miscColWidth = tableWidth * 0.16
       const remarksColWidth = tableWidth - nameColWidth - monthlyColWidth - yearlyColWidth - miscColWidth
       const monthlyColRight = margin + nameColWidth + monthlyColWidth
+      const yearlyColRight = monthlyColRight + yearlyColWidth
 
       doc.setFontSize(18)
       doc.text('CrisExpenseTracker', margin, 48)
@@ -153,7 +154,14 @@ export function BudgetPlanner() {
         doc.setFontSize(12)
         doc.setTextColor(20)
         doc.text(section.name, margin, y)
-        doc.text(`${formatMoney(sectionTotal)}/mo`, monthlyColRight, y, { align: 'right' })
+        // Smaller font for the totals so they fit within the same column widths as
+        // the table below — at the section name's larger size they overflow into
+        // the neighboring column and collide.
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'bold')
+        doc.text(formatMoney(sectionTotal), monthlyColRight, y, { align: 'right' })
+        doc.text(formatMoney(sectionTotal * 12), yearlyColRight, y, { align: 'right' })
+        doc.setFont('helvetica', 'normal')
         y += 8
 
         if (items.length > 0) {
