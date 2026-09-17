@@ -3,7 +3,7 @@ import { FileText, GripVertical, Plus, Search, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { usePeriod } from '../data/period'
 import { monthlyIncomeEntryForMonth, monthsUpTo } from '../data/selectors'
-import { formatMoney, monthKeyLabel } from '../utils/format'
+import { firstName, formatMoney, monthKeyLabel } from '../utils/format'
 import { Card } from '../components/Card'
 import { MonthPicker } from '../components/MonthPicker'
 import type { BudgetLineItem, BudgetSection, MonthlyIncome } from '../types'
@@ -55,8 +55,11 @@ export function BudgetPlanner() {
     deleteBudgetLineItem,
     duplicateBudgetMonth,
     isDuplicatingBudgetMonth,
+    profile,
   } = useStore()
   const { month } = usePeriod()
+  const userFirstName = firstName(profile?.name)
+  const exportBrand = userFirstName ? `${userFirstName} Expense Tracker` : 'CrisExpenseTracker'
 
   const [query, setQuery] = useState('')
 
@@ -131,7 +134,7 @@ export function BudgetPlanner() {
       const yearlyColRight = monthlyColRight + yearlyColWidth
 
       doc.setFontSize(18)
-      doc.text('CrisExpenseTracker', margin, 48)
+      doc.text(exportBrand, margin, 48)
       doc.setFontSize(12)
       doc.setTextColor(110)
       doc.text(`Budget Planner — ${monthKeyLabel(month)}`, margin, 68)
@@ -230,7 +233,7 @@ export function BudgetPlanner() {
       )
 
       doc.setFontSize(18)
-      doc.text('CrisExpenseTracker', margin, 48)
+      doc.text(exportBrand, margin, 48)
       doc.setFontSize(12)
       doc.setTextColor(110)
       doc.text(`Budget Planner — year to date, Jan–${monthLabelShort(month).split(' ')[0]} ${year}`, margin, 68)

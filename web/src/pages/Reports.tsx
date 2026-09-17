@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Download, FileText } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Legend, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useStore } from '../data/store'
-import { formatMoney, monthKey } from '../utils/format'
+import { firstName, formatMoney, monthKey } from '../utils/format'
 import { resolveCategory } from '../utils/resolveCategory'
 import { Card } from '../components/Card'
 import { CategoryIcon } from '../components/CategoryIcon'
@@ -44,10 +44,12 @@ function downloadCsv(rows: string[][], filename: string) {
 }
 
 export function Reports() {
-  const { transactions, categories } = useStore()
+  const { transactions, categories, profile } = useStore()
   const currentYear = String(new Date().getFullYear())
   const chartCardRef = useRef<HTMLDivElement>(null)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const userFirstName = firstName(profile?.name)
+  const exportBrand = userFirstName ? `${userFirstName} Expense Tracker` : 'CrisExpenseTracker'
 
   const years = useMemo(() => {
     const set = new Set(transactions.map((t) => monthKey(t.date).slice(0, 4)))
@@ -122,6 +124,9 @@ export function Reports() {
 
   const exportCsv = () => {
     const rows = [
+      [exportBrand],
+      [`Spending report — ${periodLabel}`],
+      [],
       ['Date', 'Merchant', 'Category', 'Amount', 'Payment Method', 'Notes'],
       ...periodTransactions.map((t) => [
         t.date.slice(0, 10),
@@ -157,7 +162,7 @@ export function Reports() {
       const margin = 40
 
       doc.setFontSize(18)
-      doc.text('CrisExpenseTracker', margin, 48)
+      doc.text(exportBrand, margin, 48)
       doc.setFontSize(12)
       doc.setTextColor(110)
       doc.text(`Spending report — ${periodLabel}`, margin, 68)

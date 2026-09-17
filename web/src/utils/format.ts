@@ -1,3 +1,5 @@
+export const firstName = (fullName: string | null | undefined): string => fullName?.trim().split(/\s+/)[0] ?? ''
+
 export const formatMoney = (amount: number): string =>
   amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
