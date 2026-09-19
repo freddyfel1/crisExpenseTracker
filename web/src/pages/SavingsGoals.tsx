@@ -106,8 +106,9 @@ function GoalCard({
       <div className="mb-3 flex items-start justify-between gap-2">
         <input
           defaultValue={goal.name}
+          placeholder="Goal name — e.g. Vacation, Car, Trip"
           onBlur={(e) => e.target.value.trim() && onSave({ name: e.target.value.trim() })}
-          className="flex-1 bg-transparent text-[15px] font-semibold text-[var(--ink)] outline-none focus:border-b focus:border-[var(--border)]"
+          className="flex-1 border-b border-transparent bg-transparent text-[15px] font-semibold text-[var(--ink)] outline-none hover:border-[var(--border)] focus:border-[var(--border)]"
         />
         <button onClick={onDelete} className="text-[var(--text-soft)] hover:text-[var(--warn)]">
           <Trash2 size={15} />
