@@ -28,7 +28,7 @@ export function BudgetPlanner() {
   } = useStore()
   const { month } = usePeriod()
   const userFirstName = firstName(profile?.name)
-  const exportBrand = userFirstName ? `${userFirstName} Expense Tracker` : 'CrisExpenseTracker'
+  const exportBrand = userFirstName ? `${userFirstName}'s Budget Planner Plus` : 'Budget Planner Plus'
 
   const [query, setQuery] = useState('')
 

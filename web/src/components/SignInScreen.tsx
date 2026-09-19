@@ -52,7 +52,7 @@ export function SignInScreen() {
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--primary)] text-white">
             <Wallet size={18} />
           </div>
-          <p className="font-display text-[19px] text-[var(--ink)]">crisExpenseTracker</p>
+          <p className="font-display text-[19px] text-[var(--ink)]">Budget Planner Plus</p>
         </div>
 
         {confirmNotice ? (

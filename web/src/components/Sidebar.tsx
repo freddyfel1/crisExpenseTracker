@@ -95,9 +95,9 @@ export function Sidebar() {
         </div>
         <div>
           <p className="font-display text-[17px] leading-tight text-[var(--ink)]">
-            {brandFirstName ? `${brandFirstName} Expense` : 'crisExpense'}
+            {brandFirstName ? `${brandFirstName} Budget` : 'Budget'}
           </p>
-          <p className="text-[11px] uppercase tracking-wide text-[var(--text-soft)]">Tracker</p>
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-soft)]">Planner Plus</p>
         </div>
       </div>
 
@@ -144,7 +144,7 @@ export function Sidebar() {
 
       <div className="mt-auto rounded-lg border border-[var(--border-soft)] bg-[var(--paper)] p-3">
         <p className="text-[12px] text-[var(--text-soft)]">
-          Capture a receipt here or on the crisExpenseTracker mobile app — either way it syncs automatically.
+          Capture a receipt here or on the Budget Planner Plus mobile app — either way it syncs automatically.
         </p>
       </div>
 
