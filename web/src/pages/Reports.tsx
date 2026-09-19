@@ -49,7 +49,7 @@ export function Reports() {
   const chartCardRef = useRef<HTMLDivElement>(null)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const userFirstName = firstName(profile?.name)
-  const exportBrand = userFirstName ? `${userFirstName} Expense Tracker` : 'CrisExpenseTracker'
+  const exportBrand = userFirstName ? `${userFirstName}'s Budget Planner Plus` : 'Budget Planner Plus'
 
   const years = useMemo(() => {
     const set = new Set(transactions.map((t) => monthKey(t.date).slice(0, 4)))
