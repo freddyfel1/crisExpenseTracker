@@ -39,7 +39,29 @@ const LOOKBACK_DAYS = 730
 type PlaidInvestmentAccount = {
   account_id: string
   name: string
+  type: string | null
   subtype: string | null
+}
+
+// Some institutions (SoFi among them) answer /investments/holdings/get with every
+// account under the item — checking and savings included — not just the investment
+// ones. Those depository accounts are already synced via the regular transactions
+// sync, so importing them here would just duplicate them as bogus "investment"
+// accounts with no holdings.
+const NON_INVESTMENT_SUBTYPES = new Set([
+  'checking',
+  'savings',
+  'cd',
+  'money market',
+  'prepaid',
+  'hsa',
+  'cash management',
+])
+
+function isInvestmentAccount(acc: PlaidInvestmentAccount): boolean {
+  if (acc.type && acc.type.toLowerCase() !== 'investment') return false
+  if (acc.subtype && NON_INVESTMENT_SUBTYPES.has(acc.subtype.toLowerCase())) return false
+  return true
 }
 
 type PlaidSecurity = {
@@ -142,8 +164,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const holdings = await holdingsRes.json()
-    const plaidAccounts = holdings.accounts as PlaidInvestmentAccount[]
-    if (!plaidAccounts || plaidAccounts.length === 0) continue
+    const plaidAccounts = ((holdings.accounts as PlaidInvestmentAccount[]) ?? []).filter(isInvestmentAccount)
+    if (plaidAccounts.length === 0) continue
 
     const accountIdMap = new Map<string, string>() // plaid account_id -> our internal id
     for (const acc of plaidAccounts) {
@@ -208,6 +230,13 @@ Deno.serve(async (req: Request) => {
         if (!accountId) return null
 
         const security = tx.security_id ? securitiesById.get(tx.security_id) : undefined
+
+        // Plaid represents cash sitting in a brokerage account as buys/sells of a
+        // synthetic "cash" security (ticker CUR:USD, security type "cash") every time
+        // money sweeps in or out — that's bookkeeping noise, not a real holding, so it's
+        // dropped entirely rather than logged as an "other" transaction.
+        if (security?.type?.toLowerCase() === 'cash' || security?.ticker_symbol?.startsWith('CUR:')) return null
+
         const symbol = security?.ticker_symbol || security?.name || 'UNKNOWN'
         const assetType = mapAssetType(security?.type ?? null)
 
