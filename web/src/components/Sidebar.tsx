@@ -19,6 +19,7 @@ import { firstName } from '../utils/format'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/budget-planner', label: 'Budget Planner', icon: FileSpreadsheet },
   {
     to: '/transactions',
     label: 'Transactions',
@@ -29,7 +30,6 @@ const NAV_ITEMS = [
     ],
   },
   { to: '/categories', label: 'Categories', icon: Tags },
-  { to: '/budget-planner', label: 'Budget Planner', icon: FileSpreadsheet },
   { to: '/savings-goals', label: 'Savings Goals', icon: PiggyBank },
   { to: '/investments', label: 'Investments', icon: TrendingUp },
   { to: '/reports', label: 'Reports', icon: BarChart3 },

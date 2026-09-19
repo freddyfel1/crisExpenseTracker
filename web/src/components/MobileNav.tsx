@@ -3,9 +3,9 @@ import { LayoutDashboard, Receipt, Tags, BarChart3, Settings as SettingsIcon, Fi
 
 const ITEMS = [
   { to: '/', icon: LayoutDashboard, end: true, label: 'Home' },
+  { to: '/budget-planner', icon: FileSpreadsheet, label: 'Planner' },
   { to: '/transactions', icon: Receipt, label: 'Txns' },
   { to: '/categories', icon: Tags, label: 'Categories' },
-  { to: '/budget-planner', icon: FileSpreadsheet, label: 'Planner' },
   { to: '/savings-goals', icon: PiggyBank, label: 'Goals' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/settings', icon: SettingsIcon, label: 'Settings' },
