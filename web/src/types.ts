@@ -45,6 +45,7 @@ export interface SavingsGoal {
   currentAmount: number
   targetDate: string | null // YYYY-MM-DD
   sortOrder: number
+  linkedCategoryId: CategoryId | null
 }
 
 export interface BudgetSection {

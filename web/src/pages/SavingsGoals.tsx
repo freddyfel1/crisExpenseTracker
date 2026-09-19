@@ -2,14 +2,22 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { formatMoney, formatDate } from '../utils/format'
 import { Card } from '../components/Card'
-import type { SavingsGoal } from '../types'
+import type { Category, SavingsGoal, Transaction } from '../types'
+
+// A goal's real progress is the manual "Saved" figure plus whatever's landed in its
+// linked category (e.g. "Transfer to Goal1") — logging a transaction there is what
+// makes money "show up" on the goal without having to re-type the total by hand.
+function transferredAmount(goal: SavingsGoal, transactions: Transaction[]) {
+  if (!goal.linkedCategoryId) return 0
+  return transactions.filter((t) => t.categoryId === goal.linkedCategoryId).reduce((sum, t) => sum + t.amount, 0)
+}
 
 export function SavingsGoals() {
-  const { savingsGoals, saveSavingsGoal, deleteSavingsGoal } = useStore()
+  const { savingsGoals, categories, transactions, saveSavingsGoal, deleteSavingsGoal } = useStore()
 
   const goals = [...savingsGoals].sort((a, b) => a.sortOrder - b.sortOrder)
   const totalTarget = goals.reduce((sum, g) => sum + g.targetAmount, 0)
-  const totalSaved = goals.reduce((sum, g) => sum + g.currentAmount, 0)
+  const totalSaved = goals.reduce((sum, g) => sum + g.currentAmount + transferredAmount(g, transactions), 0)
 
   return (
     <div className="space-y-5">
@@ -46,6 +54,8 @@ export function SavingsGoals() {
           <GoalCard
             key={goal.id}
             goal={goal}
+            categories={categories}
+            transactions={transactions}
             onSave={(patch) => saveSavingsGoal({ ...goal, ...patch })}
             onDelete={() => {
               if (window.confirm(`Delete "${goal.name}"? This cannot be undone.`)) deleteSavingsGoal(goal.id)
@@ -70,15 +80,26 @@ export function SavingsGoals() {
 
 function GoalCard({
   goal,
+  categories,
+  transactions,
   onSave,
   onDelete,
 }: {
   goal: SavingsGoal
+  categories: Category[]
+  transactions: Transaction[]
   onSave: (patch: Partial<SavingsGoal>) => void
   onDelete: () => void
 }) {
-  const pct = goal.targetAmount > 0 ? Math.min(goal.currentAmount / goal.targetAmount, 1) : 0
-  const reached = goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount
+  const linkedCategory = goal.linkedCategoryId ? categories.find((c) => c.id === goal.linkedCategoryId) : undefined
+  const linkedTransactions = linkedCategory
+    ? transactions.filter((t) => t.categoryId === linkedCategory.id).sort((a, b) => b.date.localeCompare(a.date))
+    : []
+  const transferred = linkedTransactions.reduce((sum, t) => sum + t.amount, 0)
+  const totalSaved = goal.currentAmount + transferred
+
+  const pct = goal.targetAmount > 0 ? Math.min(totalSaved / goal.targetAmount, 1) : 0
+  const reached = goal.targetAmount > 0 && totalSaved >= goal.targetAmount
 
   return (
     <Card>
@@ -97,13 +118,45 @@ function GoalCard({
         <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${pct * 100}%` }} />
       </div>
       <p className="mb-3 text-[12px] text-[var(--text-soft)]">
-        {Math.round(pct * 100)}% {reached && '— goal reached'}
+        {Math.round(pct * 100)}% of {formatMoney(goal.targetAmount)} {reached && '— goal reached'}
       </p>
 
       <div className="grid grid-cols-2 gap-3">
-        <MoneyField label="Saved" value={goal.currentAmount} onSave={(v) => onSave({ currentAmount: v })} />
+        <MoneyField
+          label={linkedCategory ? 'Manual adjustment' : 'Saved'}
+          value={goal.currentAmount}
+          onSave={(v) => onSave({ currentAmount: v })}
+        />
         <MoneyField label="Target" value={goal.targetAmount} onSave={(v) => onSave({ targetAmount: v })} />
       </div>
+
+      {linkedCategory && (
+        <div className="mt-3 border-t border-[var(--border-soft)] pt-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="text-[11px] uppercase tracking-wide text-[var(--text-soft)]">
+              From &ldquo;{linkedCategory.name}&rdquo;
+            </p>
+            <p className="text-[12px] font-medium text-[var(--ink)]">{formatMoney(transferred)}</p>
+          </div>
+          {linkedTransactions.length > 0 ? (
+            <ul className="max-h-28 space-y-1 overflow-y-auto pr-1 text-[12px]">
+              {linkedTransactions.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-2 text-[var(--text-soft)]">
+                  <span className="truncate">
+                    {t.merchant || 'Transfer'} · {formatDate(t.date)}
+                  </span>
+                  <span className="shrink-0 font-mono text-[var(--ink)]">{formatMoney(t.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[12px] text-[var(--text-soft)]">
+              Log a transaction under &ldquo;{linkedCategory.name}&rdquo; and it'll show up here.
+            </p>
+          )}
+          <p className="mt-2 text-[12px] font-medium text-[var(--ink)]">Total saved: {formatMoney(totalSaved)}</p>
+        </div>
+      )}
 
       <div className="mt-3">
         <label className="text-[11px] uppercase tracking-wide text-[var(--text-soft)]">Target date</label>

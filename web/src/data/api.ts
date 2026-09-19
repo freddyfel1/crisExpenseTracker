@@ -304,6 +304,7 @@ export async function fetchSavingsGoals(): Promise<SavingsGoal[]> {
       current_amount: number
       target_date: string | null
       sort_order: number
+      linked_category_id: string | null
     }[]
   ).map((g) => ({
     id: g.id,
@@ -312,6 +313,7 @@ export async function fetchSavingsGoals(): Promise<SavingsGoal[]> {
     currentAmount: Number(g.current_amount),
     targetDate: g.target_date,
     sortOrder: g.sort_order,
+    linkedCategoryId: g.linked_category_id,
   }))
 }
 
@@ -326,6 +328,7 @@ export async function upsertSavingsGoal(userId: string, g: Partial<SavingsGoal> 
       current_amount: g.currentAmount ?? 0,
       target_date: g.targetDate ?? null,
       sort_order: g.sortOrder ?? 0,
+      linked_category_id: g.linkedCategoryId ?? null,
     })
     .select()
     .single()
@@ -337,6 +340,7 @@ export async function upsertSavingsGoal(userId: string, g: Partial<SavingsGoal> 
     currentAmount: Number(data.current_amount),
     targetDate: data.target_date,
     sortOrder: data.sort_order,
+    linkedCategoryId: data.linked_category_id,
   } as SavingsGoal
 }
 
