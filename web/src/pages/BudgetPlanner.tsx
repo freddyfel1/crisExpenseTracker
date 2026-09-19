@@ -2,46 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, GripVertical, Plus, Search, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { usePeriod } from '../data/period'
-import { monthlyIncomeEntryForMonth, monthsUpTo } from '../data/selectors'
+import { budgetStatsForMonth, groupBudgetItemsBySection, monthsUpTo } from '../data/selectors'
 import { firstName, formatMoney, monthKeyLabel } from '../utils/format'
 import { Card } from '../components/Card'
 import { MonthPicker } from '../components/MonthPicker'
-import type { BudgetLineItem, BudgetSection, MonthlyIncome } from '../types'
+import type { BudgetLineItem, BudgetSection } from '../types'
 
 const monthLabelShort = (key: string): string => {
   const [y, m] = key.split('-').map(Number)
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-}
-
-interface BudgetStats {
-  income: number
-  expenses: number
-  savings: number
-  difference: number
-  balance: number
-}
-
-// Same computation the Summary card uses for the open month, generalized to any month so
-// the year-to-date export can total it across every month from January through the
-// selected one — a "savings" section is identified by name (see the app's own convention)
-// rather than a dedicated flag, so this has to repeat that lookup per month.
-function budgetStatsForMonth(
-  monthKey: string,
-  budgetSections: BudgetSection[],
-  itemsBySection: Map<string, BudgetLineItem[]>,
-  monthlyIncomes: MonthlyIncome[],
-): BudgetStats {
-  const sections = budgetSections.filter((s) => s.monthKey === monthKey)
-  const savingsSection = sections.find((s) => s.name.toLowerCase().includes('saving'))
-  const savings = (itemsBySection.get(savingsSection?.id ?? '') ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0)
-  const expenses = sections
-    .filter((s) => s.id !== savingsSection?.id)
-    .reduce((sum, s) => sum + (itemsBySection.get(s.id) ?? []).reduce((a, i) => a + i.monthlyAmount, 0), 0)
-  const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(monthlyIncomes, monthKey)
-  const income = monthlyIncome + otherIncome
-  const difference = income - expenses
-  const balance = difference - savings
-  return { income, expenses, savings, difference, balance }
 }
 
 export function BudgetPlanner() {
@@ -67,15 +36,7 @@ export function BudgetPlanner() {
     () => budgetSections.filter((s) => s.monthKey === month).sort((a, b) => a.sortOrder - b.sortOrder),
     [budgetSections, month],
   )
-  const itemsBySection = useMemo(() => {
-    const map = new Map<string, BudgetLineItem[]>()
-    for (const item of budgetLineItems) {
-      const list = map.get(item.sectionId) ?? []
-      list.push(item)
-      map.set(item.sectionId, list)
-    }
-    return map
-  }, [budgetLineItems])
+  const itemsBySection = useMemo(() => groupBudgetItemsBySection(budgetLineItems), [budgetLineItems])
 
   // The first time a month with no plan yet is opened, carry the nearest
   // month's sections/line items forward so the user edits amounts rather

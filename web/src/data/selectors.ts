@@ -1,4 +1,4 @@
-import type { AssetType, InvestmentTransaction, MonthlyIncome, Transaction } from '../types'
+import type { AssetType, BudgetLineItem, BudgetSection, InvestmentTransaction, MonthlyIncome, Transaction } from '../types'
 import { monthKey } from '../utils/format'
 
 export const transactionsForMonth = (transactions: Transaction[], month: string): Transaction[] =>
@@ -146,6 +146,73 @@ export const totalInvested = (transactions: InvestmentTransaction[], accountIds:
     (sum, id) => sum + holdingsForAccount(transactions, id).reduce((s, h) => s + h.costBasis, 0),
     0,
   )
+
+export const groupBudgetItemsBySection = (items: BudgetLineItem[]): Map<string, BudgetLineItem[]> => {
+  const map = new Map<string, BudgetLineItem[]>()
+  for (const item of items) {
+    const list = map.get(item.sectionId) ?? []
+    list.push(item)
+    map.set(item.sectionId, list)
+  }
+  return map
+}
+
+export interface BudgetStats {
+  income: number
+  expenses: number
+  savings: number
+  difference: number
+  balance: number
+}
+
+// A "savings" section is identified by name (see the app's own convention) rather than a
+// dedicated flag, so its line items count toward `savings` instead of `expenses` — the same
+// distinction the Budget Planner's own Summary card and PDF exports are built on.
+export function budgetStatsForMonth(
+  month: string,
+  budgetSections: BudgetSection[],
+  itemsBySection: Map<string, BudgetLineItem[]>,
+  monthlyIncomes: MonthlyIncome[],
+): BudgetStats {
+  const sections = budgetSections.filter((s) => s.monthKey === month)
+  const savingsSection = sections.find((s) => s.name.toLowerCase().includes('saving'))
+  const savings = (itemsBySection.get(savingsSection?.id ?? '') ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0)
+  const expenses = sections
+    .filter((s) => s.id !== savingsSection?.id)
+    .reduce((sum, s) => sum + (itemsBySection.get(s.id) ?? []).reduce((a, i) => a + i.monthlyAmount, 0), 0)
+  const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(monthlyIncomes, month)
+  const income = monthlyIncome + otherIncome
+  const difference = income - expenses
+  const balance = difference - savings
+  return { income, expenses, savings, difference, balance }
+}
+
+export interface SectionBudget {
+  sectionId: string
+  name: string
+  total: number
+}
+
+// Mirrors budgetStatsForMonth's `expenses` figure (savings section excluded) broken down
+// per section, so its total lines up with the "Budgeted" side of the Dashboard's
+// budget-vs-actual comparison instead of double-counting money already earmarked as savings.
+export const budgetBySection = (
+  budgetSections: BudgetSection[],
+  itemsBySection: Map<string, BudgetLineItem[]>,
+  month: string,
+): SectionBudget[] => {
+  const sections = budgetSections.filter((s) => s.monthKey === month)
+  const savingsSection = sections.find((s) => s.name.toLowerCase().includes('saving'))
+  return sections
+    .filter((s) => s.id !== savingsSection?.id)
+    .map((s) => ({
+      sectionId: s.id,
+      name: s.name,
+      total: (itemsBySection.get(s.id) ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0),
+    }))
+    .filter((s) => s.total > 0)
+    .sort((a, b) => b.total - a.total)
+}
 
 export const spendTrend = (transactions: Transaction[], monthsBack: number) => {
   const now = new Date()

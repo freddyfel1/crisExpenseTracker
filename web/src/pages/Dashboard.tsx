@@ -2,6 +2,9 @@ import { TrendingUp, Wallet, Scale, Landmark, Coins, PiggyBank } from 'lucide-re
 import { useStore } from '../data/store'
 import { usePeriod } from '../data/period'
 import {
+  budgetBySection,
+  budgetStatsForMonth,
+  groupBudgetItemsBySection,
   incomeForMonth,
   monthlyIncomeEntryForMonth,
   spendByCategory,
@@ -15,11 +18,13 @@ import { StatCard } from '../components/StatCard'
 import { EditableStatCard } from '../components/EditableStatCard'
 import { MonthPicker } from '../components/MonthPicker'
 import { CategoryBreakdown } from '../components/CategoryBreakdown'
+import { BudgetBreakdown } from '../components/BudgetBreakdown'
 import { SpendTrend } from '../components/SpendTrend'
 import { IncomeExpenseTrend } from '../components/IncomeExpenseTrend'
 
 export function Dashboard() {
-  const { transactions, categories, monthlyIncomes, saveMonthlyIncome, profile } = useStore()
+  const { transactions, categories, monthlyIncomes, budgetSections, budgetLineItems, saveMonthlyIncome, profile } =
+    useStore()
   const { month } = usePeriod()
   const firstName = profile?.name?.trim().split(/\s+/)[0]
 
@@ -35,6 +40,11 @@ export function Dashboard() {
     income: incomeForMonth(monthlyIncomes, m.key),
     expense: m.total,
   }))
+
+  const itemsBySection = groupBudgetItemsBySection(budgetLineItems)
+  const budgetData = budgetBySection(budgetSections, itemsBySection, month)
+  const { expenses: budgeted } = budgetStatsForMonth(month, budgetSections, itemsBySection, monthlyIncomes)
+  const budgetGap = spent - budgeted
 
   return (
     <div className="space-y-6">
@@ -95,8 +105,39 @@ export function Dashboard() {
         />
       </div>
 
-      <Card title="Category breakdown">
-        <CategoryBreakdown data={spend} categories={categories} />
+      <Card title="Category breakdown vs. budget planner">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div>
+            <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-[var(--text-soft)]">
+              Actual spending
+            </p>
+            <CategoryBreakdown data={spend} categories={categories} />
+          </div>
+          <div>
+            <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-[var(--text-soft)]">
+              Budget planner
+            </p>
+            <BudgetBreakdown data={budgetData} />
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-soft)] bg-[var(--paper)] px-4 py-3">
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-[var(--text-soft)]">
+            <span>
+              Budgeted <span className="font-mono text-[var(--ink)]">{formatMoney(budgeted)}</span>
+            </span>
+            <span>
+              Actual <span className="font-mono text-[var(--ink)]">{formatMoney(spent)}</span>
+            </span>
+          </div>
+          <p className={`text-[13px] font-medium ${budgetGap > 0 ? 'text-[var(--warn)]' : 'text-[var(--primary)]'}`}>
+            {budgetGap > 0
+              ? `${formatMoney(budgetGap)} over budget`
+              : budgetGap < 0
+                ? `${formatMoney(Math.abs(budgetGap))} under budget`
+                : 'Right on budget'}
+          </p>
+        </div>
       </Card>
 
       <Card title="Spending trend">
