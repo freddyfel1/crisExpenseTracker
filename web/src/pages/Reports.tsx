@@ -138,7 +138,7 @@ export function Reports() {
       ]),
     ]
     const suffix = monthFilter === 'all' ? yearFilter : `${yearFilter}-${monthFilter}`
-    downloadCsv(rows, `crisexpensetracker_transactions_${suffix}.csv`)
+    downloadCsv(rows, `budgetplannerplus_transactions_${suffix}.csv`)
   }
 
   // A printable one-pager: the actual rendered category chart (captured as an
@@ -215,7 +215,7 @@ export function Reports() {
       })
 
       const suffix = monthFilter === 'all' ? yearFilter : `${yearFilter}-${monthFilter}`
-      doc.save(`crisexpensetracker_report_${suffix}.pdf`)
+      doc.save(`budgetplannerplus_report_${suffix}.pdf`)
     } finally {
       setIsExportingPdf(false)
     }

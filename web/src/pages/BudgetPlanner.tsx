@@ -165,7 +165,7 @@ export function BudgetPlanner() {
         }
       }
 
-      doc.save(`crisexpensetracker_budget_${month}.pdf`)
+      doc.save(`budgetplannerplus_budget_${month}.pdf`)
     } finally {
       setIsExportingMonth(false)
     }
@@ -231,7 +231,7 @@ export function BudgetPlanner() {
         },
       })
 
-      doc.save(`crisexpensetracker_budget_ytd_${year}.pdf`)
+      doc.save(`budgetplannerplus_budget_ytd_${year}.pdf`)
     } finally {
       setIsExportingYtd(false)
     }
