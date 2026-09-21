@@ -9,9 +9,11 @@ import {
   fetchBudgetSections,
   fetchCategories,
   fetchInvestmentAccounts,
+  fetchInvestmentPrices,
   fetchInvestmentTransactions,
   fetchProfile,
   fetchTransactions,
+  refreshInvestmentPrices,
   updateProfile,
   upsertBudgetLineItem,
   upsertBudgetSection,
@@ -19,7 +21,15 @@ import {
   upsertInvestmentTransaction,
   upsertTransaction,
 } from '../data/api'
-import type { BudgetLineItem, BudgetSection, InvestmentAccount, InvestmentTransaction, Profile, Transaction } from '../types'
+import type {
+  AssetType,
+  BudgetLineItem,
+  BudgetSection,
+  InvestmentAccount,
+  InvestmentTransaction,
+  Profile,
+  Transaction,
+} from '../types'
 import { useSession } from './useSession'
 
 export function useTransactions() {
@@ -189,5 +199,25 @@ export function useDeleteInvestmentTransaction() {
   return useMutation({
     mutationFn: (id: string) => deleteInvestmentTransaction(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['investmentTransactions', session?.user.id] }),
+  })
+}
+
+// Not user-scoped data (a symbol's price is the same for everyone), but still gated on
+// being signed in since the table itself requires it.
+export function useInvestmentPrices() {
+  const { session } = useSession()
+  return useQuery({
+    queryKey: ['investmentPrices', session?.user.id],
+    queryFn: fetchInvestmentPrices,
+    enabled: Boolean(session),
+  })
+}
+
+export function useRefreshInvestmentPrices() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (symbols: { symbol: string; assetType: AssetType }[]) => refreshInvestmentPrices(symbols),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['investmentPrices', session?.user.id] }),
   })
 }
