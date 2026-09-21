@@ -19,6 +19,21 @@ const toLocalDate = (iso: string): Date => {
 export const formatDate = (iso: string): string =>
   toLocalDate(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
+// For a full timestamp (not a date-only string) where recency matters more than the exact
+// date — e.g. "last synced 5 minutes ago" vs. a bare date that looks the same whether sync
+// ran once this morning or hasn't run in weeks.
+export const formatRelativeTime = (iso: string): string => {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const minutes = Math.round(diffMs / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.round(hours / 24)
+  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 export const formatMonthLabel = (iso: string): string =>
   toLocalDate(iso).toLocaleDateString('en-US', { month: 'short' })
 
