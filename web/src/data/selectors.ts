@@ -147,6 +147,12 @@ export const totalInvested = (transactions: InvestmentTransaction[], accountIds:
     0,
   )
 
+// Falls back to cost basis for a holding whose live price hasn't been fetched yet (or
+// couldn't be matched by Finnhub), so the portfolio total doesn't understate itself just
+// because one symbol is unpriced.
+export const marketValue = (holdings: Holding[], prices: Record<string, number>): number =>
+  holdings.reduce((sum, h) => sum + (prices[h.symbol] != null ? prices[h.symbol] * h.quantity : h.costBasis), 0)
+
 export const groupBudgetItemsBySection = (items: BudgetLineItem[]): Map<string, BudgetLineItem[]> => {
   const map = new Map<string, BudgetLineItem[]>()
   for (const item of items) {

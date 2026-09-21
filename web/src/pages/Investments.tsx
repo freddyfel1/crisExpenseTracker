@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
+import { DollarSign, Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
-import { holdingsForAccount, totalInvested } from '../data/selectors'
+import { holdingsForAccount, marketValue, totalInvested } from '../data/selectors'
 import { syncPlaidInvestments } from '../data/api'
 import { useSession } from '../hooks/useSession'
 import { formatDate, formatMoney } from '../utils/format'
@@ -53,10 +53,13 @@ export function Investments() {
   const {
     investmentAccounts,
     investmentTransactions,
+    investmentPrices,
     saveInvestmentAccount,
     deleteInvestmentAccount,
     saveInvestmentTransaction,
     deleteInvestmentTransaction,
+    refreshInvestmentPrices,
+    isRefreshingPrices,
   } = useStore()
   const { session } = useSession()
   const queryClient = useQueryClient()
@@ -81,10 +84,39 @@ export function Investments() {
   >(null)
 
   const invested = totalInvested(investmentTransactions, investmentAccounts.map((a) => a.id))
-  const holdingCount = investmentAccounts.reduce(
-    (sum, a) => sum + holdingsForAccount(investmentTransactions, a.id).length,
-    0,
+  const allHoldings = useMemo(
+    () => investmentAccounts.flatMap((a) => holdingsForAccount(investmentTransactions, a.id)),
+    [investmentAccounts, investmentTransactions],
   )
+  const holdingCount = allHoldings.length
+  const portfolioValue = marketValue(allHoldings, investmentPrices)
+  const unrealizedGain = portfolioValue - invested
+
+  // Every symbol currently logged, regardless of account — Finnhub is queried once per
+  // symbol, not once per account, since the same stock costs the same API call either way.
+  const heldSymbols = useMemo(() => {
+    const bySymbol = new Map<string, AssetType>()
+    for (const t of investmentTransactions) bySymbol.set(t.symbol, t.assetType)
+    return [...bySymbol.entries()].map(([symbol, assetType]) => ({ symbol, assetType }))
+  }, [investmentTransactions])
+
+  const handleUpdatePrices = async () => {
+    if (heldSymbols.length === 0) {
+      window.alert('No holdings to price yet — log a transaction first.')
+      return
+    }
+    try {
+      const result = await refreshInvestmentPrices(heldSymbols)
+      const updated = Object.keys(result.prices).length
+      const skipped = result.skipped.length
+      window.alert(
+        `Updated ${updated} price${updated === 1 ? '' : 's'}.` +
+          (skipped > 0 ? ` ${skipped} symbol${skipped === 1 ? '' : 's'} couldn't be priced.` : ''),
+      )
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Price update failed.')
+    }
+  }
 
   const cryptoAccounts = investmentAccounts.filter((a) => a.accountType === 'crypto')
   const nonCryptoAccounts = investmentAccounts.filter((a) => a.accountType !== 'crypto')
@@ -116,6 +148,13 @@ export function Investments() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={handleUpdatePrices}
+            disabled={isRefreshingPrices}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)] disabled:opacity-60"
+          >
+            <DollarSign size={15} /> {isRefreshingPrices ? 'Updating…' : 'Price now'}
+          </button>
+          <button
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
             className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)] disabled:opacity-60"
@@ -131,11 +170,24 @@ export function Investments() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label="Total invested"
           value={formatMoney(invested)}
           sub="cost basis, all accounts"
+          icon={<TrendingUp size={16} className="text-[var(--text-soft)]" />}
+        />
+        <StatCard
+          label="Market value"
+          value={formatMoney(portfolioValue)}
+          sub="at last priced quote"
+          icon={<DollarSign size={16} className="text-[var(--text-soft)]" />}
+        />
+        <StatCard
+          label="Unrealized gain/loss"
+          value={`${unrealizedGain >= 0 ? '+' : ''}${formatMoney(unrealizedGain)}`}
+          sub="market value minus cost basis"
+          tone={unrealizedGain < 0 ? 'warn' : 'good'}
           icon={<TrendingUp size={16} className="text-[var(--text-soft)]" />}
         />
         <StatCard
@@ -166,6 +218,7 @@ export function Investments() {
               key={account.id}
               account={account}
               transactions={investmentTransactions.filter((t) => t.accountId === account.id)}
+              prices={investmentPrices}
               onEditAccount={() => setEditingAccount({ ...account })}
               onDeleteAccount={() => {
                 if (window.confirm(`Delete "${account.name}" and all its transactions? This cannot be undone.`))
@@ -189,6 +242,7 @@ export function Investments() {
               key={account.id}
               account={account}
               transactions={investmentTransactions.filter((t) => t.accountId === account.id)}
+              prices={investmentPrices}
               onEditAccount={() => setEditingAccount({ ...account })}
               onDeleteAccount={() => {
                 if (window.confirm(`Delete "${account.name}" and all its transactions? This cannot be undone.`))
@@ -405,6 +459,7 @@ export function Investments() {
 function AccountCard({
   account,
   transactions,
+  prices,
   onEditAccount,
   onDeleteAccount,
   onAddTransaction,
@@ -413,6 +468,7 @@ function AccountCard({
 }: {
   account: InvestmentAccount
   transactions: InvestmentTransaction[]
+  prices: Record<string, number>
   onEditAccount: () => void
   onDeleteAccount: () => void
   onAddTransaction: () => void
@@ -454,6 +510,56 @@ function AccountCard({
         </div>
       </div>
 
+      {holdings.length > 0 && (
+        <div className="mb-4">
+          <p className="mb-2 text-[12px] uppercase tracking-wide text-[var(--text-soft)]">Holdings</p>
+          <div className="overflow-x-auto rounded-lg border border-[var(--border-soft)]">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-[var(--border-soft)] text-[11px] uppercase tracking-wide text-[var(--text-soft)]">
+                  <th className="px-3 py-2 font-medium">Symbol</th>
+                  <th className="px-3 py-2 text-right font-medium">Qty</th>
+                  <th className="px-3 py-2 text-right font-medium">Avg Cost</th>
+                  <th className="px-3 py-2 text-right font-medium">Cost Basis</th>
+                  <th className="px-3 py-2 text-right font-medium">Price Now</th>
+                  <th className="px-3 py-2 text-right font-medium">Market Value</th>
+                  <th className="px-3 py-2 text-right font-medium">Gain/Loss</th>
+                </tr>
+              </thead>
+              <tbody>
+                {holdings.map((h) => {
+                  const priceNow = prices[h.symbol]
+                  const value = priceNow != null ? priceNow * h.quantity : null
+                  const gain = value != null ? value - h.costBasis : null
+                  const gainPct = gain != null && h.costBasis > 0 ? (gain / h.costBasis) * 100 : null
+                  return (
+                    <tr key={h.symbol} className="border-b border-[var(--border-soft)] last:border-0">
+                      <td className="px-3 py-2 font-medium text-[var(--ink)]">{h.symbol}</td>
+                      <td className="px-3 py-2 text-right font-mono">{h.quantity}</td>
+                      <td className="px-3 py-2 text-right font-mono">{formatMoney(h.avgCost)}</td>
+                      <td className="px-3 py-2 text-right font-mono">{formatMoney(h.costBasis)}</td>
+                      <td className="px-3 py-2 text-right font-mono">
+                        {priceNow != null ? formatMoney(priceNow) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">{value != null ? formatMoney(value) : '—'}</td>
+                      <td
+                        className={`px-3 py-2 text-right font-mono ${
+                          gain == null ? '' : gain >= 0 ? 'text-[var(--primary)]' : 'text-[var(--warn)]'
+                        }`}
+                      >
+                        {gain != null && gainPct != null
+                          ? `${gain >= 0 ? '+' : ''}${formatMoney(gain)} (${gainPct.toFixed(1)}%)`
+                          : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div className="mb-2 flex items-center justify-between">
         <p className="text-[12px] uppercase tracking-wide text-[var(--text-soft)]">Transactions</p>
         <button
@@ -476,6 +582,7 @@ function AccountCard({
                 <th className="px-3 py-2 text-right font-medium">QTY</th>
                 <th className="px-3 py-2 text-right font-medium">Buy Price</th>
                 <th className="px-3 py-2 font-medium">Buy date</th>
+                <th className="px-3 py-2 text-right font-medium">Price Now</th>
                 <th className="px-3 py-2 font-medium"></th>
               </tr>
             </thead>
@@ -491,6 +598,9 @@ function AccountCard({
                   <td className="px-3 py-2 text-right font-mono">{t.quantity}</td>
                   <td className="px-3 py-2 text-right font-mono">{formatMoney(t.pricePerUnit)}</td>
                   <td className="px-3 py-2 text-[var(--text-soft)]">{formatDate(t.date)}</td>
+                  <td className="px-3 py-2 text-right font-mono">
+                    {prices[t.symbol] != null ? formatMoney(prices[t.symbol]) : '—'}
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <button
                       onClick={(e) => {
