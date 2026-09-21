@@ -12,6 +12,7 @@ import {
 } from '../data/api'
 import { useSession } from '../hooks/useSession'
 import { Card } from '../components/Card'
+import { formatRelativeTime } from '../utils/format'
 
 export function ConnectBank() {
   const { session } = useSession()
@@ -27,6 +28,7 @@ export function ConnectBank() {
     mutationFn: syncPlaidTransactions,
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['transactions', userId] })
+      queryClient.invalidateQueries({ queryKey: ['plaid-connections', userId] })
       window.alert(`Synced ${result.synced} transaction${result.synced === 1 ? '' : 's'}.`)
     },
     onError: (err) => window.alert(err instanceof Error ? err.message : 'Sync failed.'),
@@ -56,7 +58,9 @@ export function ConnectBank() {
                   </span>
                   <span className="flex items-center gap-3">
                     <span className="text-[11px] text-[var(--text-soft)]">
-                      since {new Date(c.createdAt).toLocaleDateString()}
+                      {c.lastSyncedAt
+                        ? `last synced ${formatRelativeTime(c.lastSyncedAt)}`
+                        : `connected ${new Date(c.createdAt).toLocaleDateString()}, not yet synced`}
                     </span>
                     <button
                       onClick={() => {

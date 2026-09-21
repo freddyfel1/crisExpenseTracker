@@ -4,6 +4,10 @@
 // this app tracks income separately (see monthly_income) — and rows are upserted on
 // (user_id, plaid_transaction_id), so re-running this is always safe.
 //
+// last_synced_at is stamped on every attempt, whether or not it turned up anything new —
+// it's the UI's signal that sync actually ran, since a healthy connection with no new bank
+// activity looks identical to a broken one without it.
+//
 // verify_jwt is off (matches parse-receipt): the platform-level JWT gate also blocks CORS
 // preflight OPTIONS requests, which never carry an Authorization header. Auth is checked
 // manually below instead, exactly as strictly as verify_jwt would.
@@ -136,7 +140,10 @@ Deno.serve(async (req: Request) => {
       if (!deleteError) removed += removedIds.length
     }
 
-    await serviceClient.from('plaid_items').update({ cursor }).eq('id', item.id)
+    await serviceClient
+      .from('plaid_items')
+      .update({ cursor, last_synced_at: new Date().toISOString() })
+      .eq('id', item.id)
   }
 
   return json({ synced, removed, items: items.length }, 200)

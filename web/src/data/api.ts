@@ -484,17 +484,27 @@ export interface PlaidConnection {
   itemId: string
   institutionName: string | null
   createdAt: string
+  lastSyncedAt: string | null
 }
 
 export async function fetchPlaidConnections(): Promise<PlaidConnection[]> {
   const { data, error } = await supabase.rpc('get_plaid_connections')
   if (error) throw error
-  return (data as { id: string; item_id: string; institution_name: string | null; created_at: string }[])
+  return (
+    data as {
+      id: string
+      item_id: string
+      institution_name: string | null
+      created_at: string
+      last_synced_at: string | null
+    }[]
+  )
     .map((row) => ({
       id: row.id,
       itemId: row.item_id,
       institutionName: row.institution_name,
       createdAt: row.created_at,
+      lastSyncedAt: row.last_synced_at,
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
