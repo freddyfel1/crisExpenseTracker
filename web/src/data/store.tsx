@@ -12,12 +12,14 @@ import {
   fetchBudgetSections,
   fetchCategories,
   fetchInvestmentAccounts,
+  fetchInvestmentPrices,
   fetchInvestmentTransactions,
   fetchMonthlyIncome,
   fetchProfile,
   fetchSavingsGoals,
   fetchTransactions,
   importTransactions,
+  refreshInvestmentPrices,
   updateProfile,
   upsertBudgetLineItem,
   upsertBudgetSection,
@@ -30,6 +32,7 @@ import {
 } from './api'
 import type { ImportableTransaction } from './api'
 import type {
+  AssetType,
   BudgetLineItem,
   BudgetSection,
   Category,
@@ -93,6 +96,13 @@ export function useStore() {
   const investmentTransactionsQuery = useQuery({
     queryKey: ['investmentTransactions', userId],
     queryFn: fetchInvestmentTransactions,
+    enabled: Boolean(userId),
+  })
+  // Not user-scoped data (a symbol's price is the same for everyone), but still gated on
+  // being signed in since the table itself requires it.
+  const investmentPricesQuery = useQuery({
+    queryKey: ['investmentPrices', userId],
+    queryFn: fetchInvestmentPrices,
     enabled: Boolean(userId),
   })
 
@@ -175,6 +185,10 @@ export function useStore() {
     mutationFn: (id: string) => apiDeleteInvestmentTransaction(id),
     onSuccess: () => invalidate('investmentTransactions'),
   })
+  const refreshPrices = useMutation({
+    mutationFn: (symbols: { symbol: string; assetType: AssetType }[]) => refreshInvestmentPrices(symbols),
+    onSuccess: () => invalidate('investmentPrices'),
+  })
   const duplicateBudgetMonth = useMutation({
     mutationFn: ({ fromSections, fromItemsBySection, toMonthKey }: {
       fromSections: BudgetSection[]
@@ -197,6 +211,7 @@ export function useStore() {
     savingsGoals: savingsGoalsQuery.data ?? ([] as SavingsGoal[]),
     investmentAccounts: investmentAccountsQuery.data ?? ([] as InvestmentAccount[]),
     investmentTransactions: investmentTransactionsQuery.data ?? ([] as InvestmentTransaction[]),
+    investmentPrices: investmentPricesQuery.data ?? ({} as Record<string, number>),
     isLoading: transactionsQuery.isLoading || categoriesQuery.isLoading,
 
     addTransaction: (t: Transaction) => saveTransaction.mutate(t),
@@ -237,5 +252,8 @@ export function useStore() {
     saveInvestmentTransaction: (t: Partial<InvestmentTransaction> & { id?: string; accountId: string }) =>
       saveInvestmentTransaction.mutate(t),
     deleteInvestmentTransaction: (id: string) => removeInvestmentTransaction.mutate(id),
+    refreshInvestmentPrices: (symbols: { symbol: string; assetType: AssetType }[]) =>
+      refreshPrices.mutateAsync(symbols),
+    isRefreshingPrices: refreshPrices.isPending,
   }
 }
