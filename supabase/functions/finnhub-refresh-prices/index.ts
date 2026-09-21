@@ -72,9 +72,17 @@ Deno.serve(async (req: Request) => {
         const res = await fetch(
           `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(finnhubSymbol(symbol, assetType))}&token=${apiKey}`,
         )
-        if (!res.ok) return { symbol, price: null as number | null }
-        const data = await res.json()
-        return { symbol, price: typeof data.c === 'number' && data.c > 0 ? data.c : null }
+        const bodyText = await res.text()
+        if (!res.ok) {
+          console.error('Finnhub quote non-OK response', symbol, res.status, bodyText)
+          return { symbol, price: null as number | null }
+        }
+        const data = JSON.parse(bodyText)
+        if (!(typeof data.c === 'number' && data.c > 0)) {
+          console.error('Finnhub quote had no usable price', symbol, bodyText)
+          return { symbol, price: null as number | null }
+        }
+        return { symbol, price: data.c as number }
       } catch (err) {
         console.error('Finnhub quote error', symbol, err)
         return { symbol, price: null as number | null }
