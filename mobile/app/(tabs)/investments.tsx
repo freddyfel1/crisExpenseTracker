@@ -1,16 +1,19 @@
+import { useMemo } from 'react'
 import { ActivityIndicator, Alert, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Plus, Trash2 } from 'lucide-react-native'
+import { DollarSign, Plus, Trash2 } from 'lucide-react-native'
 import { v4 as uuidv4 } from 'uuid'
 import {
   useDeleteInvestmentAccount,
   useInvestmentAccounts,
+  useInvestmentPrices,
   useInvestmentTransactions,
+  useRefreshInvestmentPrices,
   useSaveInvestmentAccount,
   useSaveInvestmentTransaction,
 } from '../../src/hooks/useAppData'
-import { holdingsForAccount, totalInvested } from '../../src/data/selectors'
-import type { InvestmentAccount, InvestmentAccountType, InvestmentTransaction } from '../../src/types'
+import { holdingsForAccount, marketValue, totalInvested } from '../../src/data/selectors'
+import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction } from '../../src/types'
 import { formatMoney } from '../../src/utils/format'
 import { colors } from '../../src/theme'
 
@@ -35,10 +38,24 @@ function confirmDelete(message: string, onConfirm: () => void) {
 export default function InvestmentsScreen() {
   const accounts = useInvestmentAccounts()
   const transactions = useInvestmentTransactions()
+  const prices = useInvestmentPrices()
   const saveAccount = useSaveInvestmentAccount()
   const deleteAccount = useDeleteInvestmentAccount()
   const saveTransaction = useSaveInvestmentTransaction()
+  const refreshPrices = useRefreshInvestmentPrices()
   const router = useRouter()
+
+  const accountList = accounts.data ?? []
+  const txns = transactions.data ?? []
+  const priceMap = prices.data ?? {}
+
+  // Every symbol currently logged, regardless of account — Finnhub is queried once per
+  // symbol, not once per account, since the same stock costs the same API call either way.
+  const heldSymbols = useMemo(() => {
+    const bySymbol = new Map<string, AssetType>()
+    for (const t of txns) bySymbol.set(t.symbol, t.assetType)
+    return [...bySymbol.entries()].map(([symbol, assetType]) => ({ symbol, assetType }))
+  }, [txns])
 
   if (accounts.isLoading || transactions.isLoading) {
     return (
@@ -48,12 +65,32 @@ export default function InvestmentsScreen() {
     )
   }
 
-  const accountList = accounts.data ?? []
-  const txns = transactions.data ?? []
   const invested = totalInvested(txns, accountList.map((a) => a.id))
-  const holdingCount = accountList.reduce((sum, a) => sum + holdingsForAccount(txns, a.id).length, 0)
+  const allHoldings = accountList.flatMap((a) => holdingsForAccount(txns, a.id))
+  const holdingCount = allHoldings.length
+  const portfolioValue = marketValue(allHoldings, priceMap)
+  const unrealizedGain = portfolioValue - invested
   const nonCryptoAccounts = accountList.filter((a) => a.accountType !== 'crypto')
   const cryptoAccounts = accountList.filter((a) => a.accountType === 'crypto')
+
+  const handleUpdatePrices = async () => {
+    if (heldSymbols.length === 0) {
+      Alert.alert('No holdings to price yet', 'Log a transaction first.')
+      return
+    }
+    try {
+      const result = await refreshPrices.mutateAsync(heldSymbols)
+      const updated = Object.keys(result.prices).length
+      const skipped = result.skipped.length
+      Alert.alert(
+        'Prices updated',
+        `Updated ${updated} price${updated === 1 ? '' : 's'}.` +
+          (skipped > 0 ? ` ${skipped} symbol${skipped === 1 ? '' : 's'} couldn't be priced.` : ''),
+      )
+    } catch (err) {
+      Alert.alert('Price update failed', err instanceof Error ? err.message : 'Unknown error')
+    }
+  }
 
   const addAccount = () => {
     const id = uuidv4()
@@ -84,9 +121,20 @@ export default function InvestmentsScreen() {
         <Text style={styles.title}>Investments</Text>
         <Text style={styles.subtitle}>ETFs, crypto, and other holdings you track by hand.</Text>
 
+        <Pressable style={styles.priceNowButton} onPress={handleUpdatePrices} disabled={refreshPrices.isPending}>
+          <DollarSign size={15} color={colors.ink} />
+          <Text style={styles.priceNowText}>{refreshPrices.isPending ? 'Updating…' : 'Price now'}</Text>
+        </Pressable>
+
         <View style={styles.card}>
           <View style={styles.summaryGrid}>
             <SummaryStat label="Invested" value={formatMoney(invested)} />
+            <SummaryStat label="Market value" value={formatMoney(portfolioValue)} />
+            <SummaryStat
+              label="Gain/loss"
+              value={`${unrealizedGain >= 0 ? '+' : ''}${formatMoney(unrealizedGain)}`}
+              tone={unrealizedGain < 0 ? 'warn' : 'good'}
+            />
             <SummaryStat label="Accounts" value={String(accountList.length)} />
             <SummaryStat label="Holdings" value={String(holdingCount)} />
           </View>
@@ -104,6 +152,7 @@ export default function InvestmentsScreen() {
                 key={account.id}
                 account={account}
                 transactions={txns.filter((t) => t.accountId === account.id)}
+                prices={priceMap}
                 onEditAccount={() => router.push(`/investment-account/${account.id}`)}
                 onDeleteAccount={() =>
                   confirmDelete(`Delete "${account.name}" and all its transactions?`, () =>
@@ -125,6 +174,7 @@ export default function InvestmentsScreen() {
                 key={account.id}
                 account={account}
                 transactions={txns.filter((t) => t.accountId === account.id)}
+                prices={priceMap}
                 onEditAccount={() => router.push(`/investment-account/${account.id}`)}
                 onDeleteAccount={() =>
                   confirmDelete(`Delete "${account.name}" and all its transactions?`, () =>
@@ -147,11 +197,19 @@ export default function InvestmentsScreen() {
   )
 }
 
-function SummaryStat({ label, value }: { label: string; value: string }) {
+function SummaryStat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' }) {
   return (
     <View style={styles.summaryStat}>
       <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>{value}</Text>
+      <Text
+        style={[
+          styles.summaryValue,
+          tone === 'good' && { color: colors.primary },
+          tone === 'warn' && { color: colors.warn },
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   )
 }
@@ -159,6 +217,7 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
 function AccountCard({
   account,
   transactions,
+  prices,
   onEditAccount,
   onDeleteAccount,
   onAddTransaction,
@@ -166,6 +225,7 @@ function AccountCard({
 }: {
   account: InvestmentAccount
   transactions: InvestmentTransaction[]
+  prices: Record<string, number>
   onEditAccount: () => void
   onDeleteAccount: () => void
   onAddTransaction: () => void
@@ -193,15 +253,33 @@ function AccountCard({
 
       {holdings.length > 0 && (
         <View style={styles.holdings}>
-          {holdings.map((h) => (
-            <View key={h.symbol} style={styles.holdingRow}>
-              <Text style={styles.holdingSymbol}>{h.symbol}</Text>
-              <Text style={styles.holdingDetail}>
-                {h.quantity} @ {formatMoney(h.avgCost)}
-              </Text>
-              <Text style={styles.holdingCost}>{formatMoney(h.costBasis)}</Text>
-            </View>
-          ))}
+          {holdings.map((h) => {
+            const priceNow = prices[h.symbol]
+            const value = priceNow != null ? priceNow * h.quantity : null
+            const gain = value != null ? value - h.costBasis : null
+            return (
+              <View key={h.symbol} style={styles.holdingBlock}>
+                <View style={styles.holdingRow}>
+                  <Text style={styles.holdingSymbol}>{h.symbol}</Text>
+                  <Text style={styles.holdingDetail}>
+                    {h.quantity} @ {formatMoney(h.avgCost)}
+                  </Text>
+                  <Text style={styles.holdingCost}>{formatMoney(h.costBasis)}</Text>
+                </View>
+                <View style={styles.holdingRow}>
+                  <Text style={styles.holdingPriceLabel}>
+                    {priceNow != null ? `Now ${formatMoney(priceNow)}` : 'Price not fetched'}
+                  </Text>
+                  {value != null && gain != null && (
+                    <Text style={[styles.holdingGain, { color: gain < 0 ? colors.warn : colors.primary }]}>
+                      {formatMoney(value)} ({gain >= 0 ? '+' : ''}
+                      {formatMoney(gain)})
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )
+          })}
         </View>
       )}
 
@@ -232,6 +310,20 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
   subtitle: { fontSize: 13, color: colors.textSoft, marginTop: -8 },
   empty: { fontSize: 13, color: colors.textSoft },
+  priceNowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  priceNowText: { fontSize: 13, fontWeight: '600', color: colors.ink },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -255,11 +347,14 @@ const styles = StyleSheet.create({
   accountName: { fontSize: 15, fontWeight: '600', color: colors.ink },
   accountMeta: { fontSize: 12, color: colors.textSoft, marginTop: 2 },
   accountTotal: { fontSize: 14, fontWeight: '600', color: colors.ink, fontVariant: ['tabular-nums'] },
-  holdings: { gap: 4, borderTopWidth: 1, borderTopColor: colors.borderSoft, paddingTop: 8 },
+  holdings: { gap: 8, borderTopWidth: 1, borderTopColor: colors.borderSoft, paddingTop: 8 },
+  holdingBlock: { gap: 2 },
   holdingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   holdingSymbol: { fontSize: 12.5, fontWeight: '600', color: colors.ink, width: 60 },
   holdingDetail: { fontSize: 12, color: colors.textSoft, flex: 1 },
   holdingCost: { fontSize: 12.5, fontWeight: '600', color: colors.ink, fontVariant: ['tabular-nums'] },
+  holdingPriceLabel: { fontSize: 11.5, color: colors.textSoft, width: 60 + 8 },
+  holdingGain: { fontSize: 12, fontWeight: '600', flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] },
   recentList: { gap: 4, borderTopWidth: 1, borderTopColor: colors.borderSoft, paddingTop: 8 },
   recentRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
   recentText: { fontSize: 12.5, color: colors.ink },

@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type {
+  AssetType,
   BudgetLineItem,
   BudgetSection,
   Category,
@@ -259,6 +260,22 @@ export async function upsertInvestmentTransaction(
 export async function deleteInvestmentTransaction(id: string) {
   const { error } = await supabase.from('investment_transactions').delete().eq('id', id)
   if (error) throw error
+}
+
+export async function fetchInvestmentPrices(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from('investment_prices').select('symbol, price')
+  if (error) throw error
+  const prices: Record<string, number> = {}
+  for (const row of data as { symbol: string; price: number }[]) prices[row.symbol] = Number(row.price)
+  return prices
+}
+
+export async function refreshInvestmentPrices(
+  symbols: { symbol: string; assetType: AssetType }[],
+): Promise<{ prices: Record<string, number>; skipped: string[] }> {
+  const { data, error } = await supabase.functions.invoke('finnhub-refresh-prices', { body: { symbols } })
+  if (error) throw error
+  return data
 }
 
 export async function uploadReceiptPhoto(userId: string, localUri: string): Promise<string> {

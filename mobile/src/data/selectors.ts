@@ -81,3 +81,8 @@ export const totalInvested = (transactions: InvestmentTransaction[], accountIds:
     (sum, id) => sum + holdingsForAccount(transactions, id).reduce((s, h) => s + h.costBasis, 0),
     0,
   )
+
+// Mirrors web/src/data/selectors.ts marketValue — falls back to cost basis for a holding
+// whose live price hasn't been fetched yet (or couldn't be matched by Finnhub).
+export const marketValue = (holdings: Holding[], prices: Record<string, number>): number =>
+  holdings.reduce((sum, h) => sum + (prices[h.symbol] != null ? prices[h.symbol] * h.quantity : h.costBasis), 0)
