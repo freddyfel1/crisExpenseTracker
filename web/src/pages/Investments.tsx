@@ -6,7 +6,7 @@ import { useStore } from '../data/store'
 import { holdingsForAccount, marketValue, totalInvested } from '../data/selectors'
 import { syncPlaidInvestments } from '../data/api'
 import { useSession } from '../hooks/useSession'
-import { formatDate, formatMoney } from '../utils/format'
+import { formatDate, formatMoney, formatRelativeTime } from '../utils/format'
 import { StatCard } from '../components/StatCard'
 import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction, InvestmentTransactionType } from '../types'
 
@@ -54,6 +54,7 @@ export function Investments() {
     investmentAccounts,
     investmentTransactions,
     investmentPrices,
+    investmentsLastSynced,
     saveInvestmentAccount,
     deleteInvestmentAccount,
     saveInvestmentTransaction,
@@ -69,6 +70,7 @@ export function Investments() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['investmentAccounts', session?.user.id] })
       queryClient.invalidateQueries({ queryKey: ['investmentTransactions', session?.user.id] })
+      queryClient.invalidateQueries({ queryKey: ['investmentsLastSynced', session?.user.id] })
       window.alert(
         result.items === 0
           ? 'No banks connected yet — connect one first.'
@@ -154,13 +156,20 @@ export function Investments() {
           >
             <DollarSign size={15} /> {isRefreshingPrices ? 'Updating…' : 'Price now'}
           </button>
-          <button
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)] disabled:opacity-60"
-          >
-            <RefreshCw size={15} /> {syncMutation.isPending ? 'Syncing…' : 'Sync from bank'}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)] disabled:opacity-60"
+            >
+              <RefreshCw size={15} /> {syncMutation.isPending ? 'Syncing…' : 'Sync from bank'}
+            </button>
+            {investmentsLastSynced && (
+              <span className="text-[11px] text-[var(--text-soft)]">
+                last synced {formatRelativeTime(investmentsLastSynced)}
+              </span>
+            )}
+          </div>
           <button
             onClick={() => setEditingAccount(emptyAccount())}
             className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
