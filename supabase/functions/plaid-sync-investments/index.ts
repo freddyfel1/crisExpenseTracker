@@ -13,6 +13,10 @@
 // answers holdings/get with Plaid's PRODUCT_NOT_READY / INVALID_PRODUCT — that item is just
 // skipped, not treated as a hard failure, since /transactions/sync still works fine for it.
 //
+// investments_last_synced_at is a separate column from plaid-sync-transactions' last_synced_at
+// (0017) since the two syncs run independently — one shouldn't make the other look fresher
+// than it is.
+//
 // verify_jwt is off (matches parse-receipt): the platform-level JWT gate also blocks CORS
 // preflight OPTIONS requests, which never carry an Authorization header. Auth is checked
 // manually below instead, exactly as strictly as verify_jwt would.
@@ -154,6 +158,14 @@ Deno.serve(async (req: Request) => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ client_id: clientId, secret, access_token: item.access_token }),
     })
+
+    // Stamped as soon as we've heard back from Plaid, whatever the result — a
+    // PRODUCT_NOT_READY skip below still counts as "we tried", same as 0017's
+    // last_synced_at for the regular transactions sync.
+    await serviceClient
+      .from('plaid_items')
+      .update({ investments_last_synced_at: new Date().toISOString() })
+      .eq('id', item.id)
 
     if (!holdingsRes.ok) {
       // Investments product not enabled/supported for this item — skip it, not an error.

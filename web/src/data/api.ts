@@ -544,6 +544,12 @@ export async function syncPlaidInvestments(): Promise<{
   return data
 }
 
+export async function fetchInvestmentsLastSynced(): Promise<string | null> {
+  const { data, error } = await supabase.rpc('get_investments_last_synced')
+  if (error) throw error
+  return data
+}
+
 export async function fetchInvestmentPrices(): Promise<Record<string, number>> {
   const { data, error } = await supabase.from('investment_prices').select('symbol, price')
   if (error) throw error

@@ -13,6 +13,7 @@ import {
   fetchCategories,
   fetchInvestmentAccounts,
   fetchInvestmentPrices,
+  fetchInvestmentsLastSynced,
   fetchInvestmentTransactions,
   fetchMonthlyIncome,
   fetchProfile,
@@ -103,6 +104,11 @@ export function useStore() {
   const investmentPricesQuery = useQuery({
     queryKey: ['investmentPrices', userId],
     queryFn: fetchInvestmentPrices,
+    enabled: Boolean(userId),
+  })
+  const investmentsLastSyncedQuery = useQuery({
+    queryKey: ['investmentsLastSynced', userId],
+    queryFn: fetchInvestmentsLastSynced,
     enabled: Boolean(userId),
   })
 
@@ -212,6 +218,7 @@ export function useStore() {
     investmentAccounts: investmentAccountsQuery.data ?? ([] as InvestmentAccount[]),
     investmentTransactions: investmentTransactionsQuery.data ?? ([] as InvestmentTransaction[]),
     investmentPrices: investmentPricesQuery.data ?? ({} as Record<string, number>),
+    investmentsLastSynced: investmentsLastSyncedQuery.data ?? null,
     isLoading: transactionsQuery.isLoading || categoriesQuery.isLoading,
 
     addTransaction: (t: Transaction) => saveTransaction.mutate(t),
