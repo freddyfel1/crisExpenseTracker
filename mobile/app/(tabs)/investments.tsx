@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { DollarSign, Plus, Trash2 } from 'lucide-react-native'
+import { DollarSign, FileText, Plus, Trash2 } from 'lucide-react-native'
 import { v4 as uuidv4 } from 'uuid'
+import * as Print from 'expo-print'
+import * as Sharing from 'expo-sharing'
 import {
   useDeleteInvestmentAccount,
   useInvestmentAccounts,
@@ -16,6 +18,7 @@ import { holdingsForAccount, marketValue, totalInvested } from '../../src/data/s
 import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction } from '../../src/types'
 import { formatMoney } from '../../src/utils/format'
 import { colors } from '../../src/theme'
+import { HoldingsGainLoss } from '../../src/components/HoldingsGainLoss'
 
 const ACCOUNT_TYPE_LABELS: Record<InvestmentAccountType, string> = {
   brokerage: 'Brokerage',
@@ -44,6 +47,7 @@ export default function InvestmentsScreen() {
   const saveTransaction = useSaveInvestmentTransaction()
   const refreshPrices = useRefreshInvestmentPrices()
   const router = useRouter()
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const accountList = accounts.data ?? []
   const txns = transactions.data ?? []
@@ -92,6 +96,32 @@ export default function InvestmentsScreen() {
     }
   }
 
+  const exportPdf = async () => {
+    setIsExportingPdf(true)
+    try {
+      const html = buildInvestmentsHtml({
+        accounts: accountList,
+        transactionsByAccount: txns,
+        prices: priceMap,
+        invested,
+        portfolioValue,
+        unrealizedGain,
+        holdingCount,
+      })
+      const { uri } = await Print.printToFileAsync({ html })
+      const canShare = await Sharing.isAvailableAsync()
+      if (canShare) {
+        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: 'Investments PDF' })
+      } else {
+        Alert.alert('PDF saved', uri)
+      }
+    } catch (err) {
+      Alert.alert('Export failed', err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsExportingPdf(false)
+    }
+  }
+
   const addAccount = () => {
     const id = uuidv4()
     saveAccount.mutate({ id, name: 'New account', institution: '', accountType: 'brokerage' })
@@ -121,10 +151,16 @@ export default function InvestmentsScreen() {
         <Text style={styles.title}>Investments</Text>
         <Text style={styles.subtitle}>ETFs, crypto, and other holdings you track by hand.</Text>
 
-        <Pressable style={styles.priceNowButton} onPress={handleUpdatePrices} disabled={refreshPrices.isPending}>
-          <DollarSign size={15} color={colors.ink} />
-          <Text style={styles.priceNowText}>{refreshPrices.isPending ? 'Updating…' : 'Price now'}</Text>
-        </Pressable>
+        <View style={styles.actionsRow}>
+          <Pressable style={styles.priceNowButton} onPress={handleUpdatePrices} disabled={refreshPrices.isPending}>
+            <DollarSign size={15} color={colors.ink} />
+            <Text style={styles.priceNowText}>{refreshPrices.isPending ? 'Updating…' : 'Price now'}</Text>
+          </Pressable>
+          <Pressable style={styles.priceNowButton} onPress={exportPdf} disabled={isExportingPdf}>
+            <FileText size={15} color={colors.ink} />
+            <Text style={styles.priceNowText}>{isExportingPdf ? 'Preparing…' : 'Export PDF'}</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.card}>
           <View style={styles.summaryGrid}>
@@ -139,6 +175,13 @@ export default function InvestmentsScreen() {
             <SummaryStat label="Holdings" value={String(holdingCount)} />
           </View>
         </View>
+
+        {allHoldings.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Gain/loss by holding</Text>
+            <HoldingsGainLoss holdings={allHoldings} prices={priceMap} />
+          </View>
+        )}
 
         {accountList.length === 0 && (
           <Text style={styles.empty}>No investment accounts yet — add one to start logging buys and sells.</Text>
@@ -304,12 +347,117 @@ function AccountCard({
   )
 }
 
+// account.name/institution are free-text user input — escaped before landing in the
+// HTML string handed to expo-print, same reasoning as escaping user input into any
+// other HTML document.
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function buildInvestmentsHtml({
+  accounts,
+  transactionsByAccount,
+  prices,
+  invested,
+  portfolioValue,
+  unrealizedGain,
+  holdingCount,
+}: {
+  accounts: InvestmentAccount[]
+  transactionsByAccount: InvestmentTransaction[]
+  prices: Record<string, number>
+  invested: number
+  portfolioValue: number
+  unrealizedGain: number
+  holdingCount: number
+}): string {
+  const today = new Date().toISOString().slice(0, 10)
+
+  const accountsHtml = accounts
+    .map((account) => {
+      const holdings = holdingsForAccount(transactionsByAccount, account.id)
+      const costBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
+      const rowsHtml = holdings
+        .map((h) => {
+          const priceNow = prices[h.symbol]
+          const value = priceNow != null ? priceNow * h.quantity : null
+          const gain = value != null ? value - h.costBasis : null
+          const gainClass = gain == null ? '' : gain >= 0 ? 'gain' : 'loss'
+          return `<tr>
+            <td>${escapeHtml(h.symbol)}</td>
+            <td>${h.quantity}</td>
+            <td>${formatMoney(h.avgCost)}</td>
+            <td>${formatMoney(h.costBasis)}</td>
+            <td>${priceNow != null ? formatMoney(priceNow) : '—'}</td>
+            <td>${value != null ? formatMoney(value) : '—'}</td>
+            <td class="${gainClass}">${gain != null ? `${gain >= 0 ? '+' : ''}${formatMoney(gain)}` : '—'}</td>
+          </tr>`
+        })
+        .join('')
+
+      const tableHtml =
+        holdings.length > 0
+          ? `<table>
+            <thead><tr><th>Symbol</th><th>Qty</th><th>Avg Cost</th><th>Cost Basis</th><th>Price Now</th><th>Market Value</th><th>Gain/Loss</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>`
+          : `<p class="empty">No holdings logged.</p>`
+
+      return `<div class="account">
+        <div class="account-header">
+          <span>${escapeHtml(account.name)}</span>
+          <span>${formatMoney(costBasis)}</span>
+        </div>
+        <div class="account-meta">${escapeHtml(ACCOUNT_TYPE_LABELS[account.accountType])}${account.institution ? ` · ${escapeHtml(account.institution)}` : ''}</div>
+        ${tableHtml}
+      </div>`
+    })
+    .join('')
+
+  return `<!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 24px; color: ${colors.ink}; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .subtitle { color: ${colors.textSoft}; font-size: 13px; margin: 0 0 16px; }
+      .summary { font-size: 13px; margin-bottom: 20px; }
+      .account { margin-bottom: 20px; page-break-inside: avoid; }
+      .account-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; }
+      .account-meta { color: ${colors.textSoft}; font-size: 11px; margin-bottom: 6px; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      th { background: ${colors.ink}; color: #fff; text-align: right; padding: 6px 8px; }
+      th:first-child { text-align: left; }
+      td { padding: 6px 8px; border-bottom: 1px solid ${colors.borderSoft}; text-align: right; }
+      td:first-child { text-align: left; font-weight: 600; }
+      .gain { color: ${colors.primary}; }
+      .loss { color: ${colors.warn}; }
+      .empty { color: ${colors.textSoft}; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Budget Planner Plus</h1>
+    <p class="subtitle">Investments — ${today}</p>
+    <p class="summary">
+      <strong>Invested</strong> ${formatMoney(invested)} &nbsp;
+      <strong>Market value</strong> ${formatMoney(portfolioValue)} &nbsp;
+      <strong>Gain/loss</strong> ${unrealizedGain >= 0 ? '+' : ''}${formatMoney(unrealizedGain)} &nbsp;
+      ${accounts.length} account${accounts.length === 1 ? '' : 's'}, ${holdingCount} holding${holdingCount === 1 ? '' : 's'}
+    </p>
+    ${accountsHtml}
+  </body>
+  </html>`
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
   subtitle: { fontSize: 13, color: colors.textSoft, marginTop: -8 },
   empty: { fontSize: 13, color: colors.textSoft },
+  actionsRow: { flexDirection: 'row', gap: 10 },
+  cardTitle: { fontSize: 13, fontWeight: '600', color: colors.ink, marginBottom: 4 },
   priceNowButton: {
     flexDirection: 'row',
     alignItems: 'center',
