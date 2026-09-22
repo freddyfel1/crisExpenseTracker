@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { DollarSign, Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
+import { DollarSign, FileText, Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { holdingsForAccount, marketValue, totalInvested } from '../data/selectors'
 import { syncPlaidInvestments } from '../data/api'
 import { useSession } from '../hooks/useSession'
-import { formatDate, formatMoney, formatRelativeTime } from '../utils/format'
+import { firstName, formatDate, formatMoney, formatRelativeTime } from '../utils/format'
 import { StatCard } from '../components/StatCard'
 import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction, InvestmentTransactionType } from '../types'
 
@@ -61,9 +61,13 @@ export function Investments() {
     deleteInvestmentTransaction,
     refreshInvestmentPrices,
     isRefreshingPrices,
+    profile,
   } = useStore()
   const { session } = useSession()
   const queryClient = useQueryClient()
+  const userFirstName = firstName(profile?.name)
+  const exportBrand = userFirstName ? `${userFirstName}'s Budget Planner Plus` : 'Budget Planner Plus'
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const syncMutation = useMutation({
     mutationFn: syncPlaidInvestments,
@@ -120,6 +124,109 @@ export function Investments() {
     }
   }
 
+  // Every account with its derived holdings, in the same order they appear on screen —
+  // the PDF is a full record of the portfolio, not just what's currently expanded.
+  const accountsForExport = useMemo(
+    () =>
+      investmentAccounts.map((account) => ({
+        account,
+        holdings: holdingsForAccount(investmentTransactions, account.id),
+      })),
+    [investmentAccounts, investmentTransactions],
+  )
+
+  const exportPdf = async () => {
+    setIsExportingPdf(true)
+    try {
+      const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+      const margin = 40
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const today = new Date().toISOString().slice(0, 10)
+
+      doc.setFontSize(18)
+      doc.text(exportBrand, margin, 48)
+      doc.setFontSize(12)
+      doc.setTextColor(110)
+      doc.text(`Investments — ${today}`, margin, 68)
+
+      doc.setFontSize(11)
+      doc.setTextColor(20)
+      doc.text(
+        `Invested ${formatMoney(invested)}   Market value ${formatMoney(portfolioValue)}   ` +
+          `Gain/loss ${unrealizedGain >= 0 ? '+' : ''}${formatMoney(unrealizedGain)}   ` +
+          `${investmentAccounts.length} account${investmentAccounts.length === 1 ? '' : 's'}, ` +
+          `${holdingCount} holding${holdingCount === 1 ? '' : 's'}`,
+        margin,
+        88,
+      )
+
+      let y = 108
+      for (const { account, holdings } of accountsForExport) {
+        if (y > pageHeight - 100) {
+          doc.addPage()
+          y = margin
+        }
+        const accountCostBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
+
+        doc.setFontSize(12)
+        doc.setTextColor(20)
+        doc.setFont('helvetica', 'bold')
+        doc.text(account.name, margin, y)
+        doc.setFont('helvetica', 'normal')
+        doc.text(formatMoney(accountCostBasis), pageWidth - margin, y, { align: 'right' })
+        doc.setFontSize(9)
+        doc.setTextColor(110)
+        doc.text(
+          `${ACCOUNT_TYPE_LABELS[account.accountType]}${account.institution ? ` · ${account.institution}` : ''}`,
+          margin,
+          y + 12,
+        )
+        y += 24
+
+        if (holdings.length > 0) {
+          autoTable(doc, {
+            startY: y,
+            margin: { left: margin, right: margin },
+            head: [['Symbol', 'Qty', 'Avg Cost', 'Cost Basis', 'Price Now', 'Market Value', 'Gain/Loss']],
+            body: holdings.map((h) => {
+              const priceNow = investmentPrices[h.symbol]
+              const value = priceNow != null ? priceNow * h.quantity : null
+              const gain = value != null ? value - h.costBasis : null
+              return [
+                h.symbol,
+                String(h.quantity),
+                formatMoney(h.avgCost),
+                formatMoney(h.costBasis),
+                priceNow != null ? formatMoney(priceNow) : '—',
+                value != null ? formatMoney(value) : '—',
+                gain != null ? `${gain >= 0 ? '+' : ''}${formatMoney(gain)}` : '—',
+              ]
+            }),
+            headStyles: { fillColor: [31, 41, 55] },
+            styles: { fontSize: 9 },
+            // columnStyles.halign only reaches body cells in this autoTable version —
+            // header cells stay left-positioned, so force it per cell regardless of section.
+            didParseCell: (data) => {
+              if (data.column.index >= 1) data.cell.styles.halign = 'right'
+            },
+          })
+          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20
+        } else {
+          doc.setFontSize(9)
+          doc.setTextColor(140)
+          doc.text('No holdings logged.', margin, y + 10)
+          y += 30
+        }
+      }
+
+      doc.save(`BudgetPlannerPlus_investments_${today}.pdf`)
+    } finally {
+      setIsExportingPdf(false)
+    }
+  }
+
   const cryptoAccounts = investmentAccounts.filter((a) => a.accountType === 'crypto')
   const nonCryptoAccounts = investmentAccounts.filter((a) => a.accountType !== 'crypto')
 
@@ -170,6 +277,13 @@ export function Investments() {
               </span>
             )}
           </div>
+          <button
+            onClick={exportPdf}
+            disabled={isExportingPdf}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)] disabled:opacity-60"
+          >
+            <FileText size={15} /> {isExportingPdf ? 'Preparing PDF…' : 'Export PDF'}
+          </button>
           <button
             onClick={() => setEditingAccount(emptyAccount())}
             className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
