@@ -8,6 +8,8 @@ import { syncPlaidInvestments } from '../data/api'
 import { useSession } from '../hooks/useSession'
 import { firstName, formatDate, formatMoney, formatRelativeTime } from '../utils/format'
 import { StatCard } from '../components/StatCard'
+import { Card } from '../components/Card'
+import { HoldingsGainLoss } from '../components/HoldingsGainLoss'
 import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction, InvestmentTransactionType } from '../types'
 
 const ACCOUNT_TYPE_LABELS: Record<InvestmentAccountType, string> = {
@@ -324,6 +326,12 @@ export function Investments() {
           icon={<Layers size={16} className="text-[var(--text-soft)]" />}
         />
       </div>
+
+      {allHoldings.length > 0 && (
+        <Card title="Gain/loss by holding">
+          <HoldingsGainLoss holdings={allHoldings} prices={investmentPrices} />
+        </Card>
+      )}
 
       {investmentAccounts.length === 0 && (
         <p className="text-[13px] text-[var(--text-soft)]">
