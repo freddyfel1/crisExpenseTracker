@@ -47,7 +47,12 @@ interface Props {
   description: string
   isIncluded: (assetType: AssetType) => boolean
   defaultAssetType: AssetType
-  defaultAccountType: InvestmentAccountType
+  // Which existing accounts belong on this screen by account type alone (the crypto
+  // screen wants exactly 'crypto'; the main screen wants everything else — retirement
+  // and other accounts included, not just brokerage). `newAccountType` is the single
+  // concrete type assigned when this screen creates a brand-new account.
+  isDefaultAccountType: (accountType: InvestmentAccountType) => boolean
+  newAccountType: InvestmentAccountType
   pdfSubtitle: string
   emptyHint: string
   sectionLabel?: string
@@ -65,7 +70,8 @@ export function InvestmentsAssetScreen({
   description,
   isIncluded,
   defaultAssetType,
-  defaultAccountType,
+  isDefaultAccountType,
+  newAccountType,
   pdfSubtitle,
   emptyHint,
   sectionLabel,
@@ -87,15 +93,15 @@ export function InvestmentsAssetScreen({
 
   const pageTransactions = useMemo(() => txns.filter((t) => isIncluded(t.assetType)), [txns, isIncluded])
   // An account belongs here either because it already has a matching-type transaction
-  // (the mixed-account case), or because it was created *as* this screen's default
-  // account type — otherwise a brand-new account added from this screen, with no
-  // transactions yet, would show up nowhere until its first transaction was logged.
+  // (the mixed-account case), or because its own account type belongs on this screen —
+  // otherwise a brand-new account added from this screen, with no transactions yet,
+  // would show up nowhere until its first transaction was logged.
   const pageAccounts = useMemo(
     () =>
       accountList.filter(
-        (a) => a.accountType === defaultAccountType || pageTransactions.some((t) => t.accountId === a.id),
+        (a) => isDefaultAccountType(a.accountType) || pageTransactions.some((t) => t.accountId === a.id),
       ),
-    [accountList, pageTransactions, defaultAccountType],
+    [accountList, pageTransactions, isDefaultAccountType],
   )
 
   // Every symbol logged on this screen — Finnhub is queried once per symbol, not once
@@ -166,27 +172,39 @@ export function InvestmentsAssetScreen({
     }
   }
 
-  const addAccount = () => {
+  // Waits for the save to actually land before navigating — pushing to the detail screen
+  // on a fire-and-forget mutate() left the user stranded on that screen's permanent
+  // loading spinner (it looks up the new record by id, which never arrives) whenever the
+  // save failed, with no error shown and the record never created.
+  const addAccount = async () => {
     const id = uuidv4()
-    saveAccount.mutate({ id, name: 'New account', institution: '', accountType: defaultAccountType })
-    router.push(`/investment-account/${id}`)
+    try {
+      await saveAccount.mutateAsync({ id, name: 'New account', institution: '', accountType: newAccountType })
+      router.push(`/investment-account/${id}`)
+    } catch (err) {
+      Alert.alert('Could not add account', err instanceof Error ? err.message : 'Unknown error')
+    }
   }
 
-  const addTransaction = (accountId: string) => {
+  const addTransaction = async (accountId: string) => {
     const id = uuidv4()
-    saveTransaction.mutate({
-      id,
-      accountId,
-      symbol: '',
-      assetType: defaultAssetType,
-      transactionType: 'buy',
-      quantity: 0,
-      pricePerUnit: 0,
-      fees: 0,
-      date: new Date().toISOString().slice(0, 10),
-      notes: '',
-    })
-    router.push(`/investment-transaction/${id}`)
+    try {
+      await saveTransaction.mutateAsync({
+        id,
+        accountId,
+        symbol: '',
+        assetType: defaultAssetType,
+        transactionType: 'buy',
+        quantity: 0,
+        pricePerUnit: 0,
+        fees: 0,
+        date: new Date().toISOString().slice(0, 10),
+        notes: '',
+      })
+      router.push(`/investment-transaction/${id}`)
+    } catch (err) {
+      Alert.alert('Could not add transaction', err instanceof Error ? err.message : 'Unknown error')
+    }
   }
 
   return (

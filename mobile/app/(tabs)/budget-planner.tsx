@@ -130,7 +130,8 @@ function SummaryStat({
   const [draft, setDraft] = useState(String(value))
 
   const commit = () => {
-    const parsed = Number(draft)
+    // Number('') is 0, not NaN — an emptied field must not silently save as $0.
+    const parsed = draft.trim() === '' ? NaN : Number(draft)
     if (!Number.isNaN(parsed)) onSave?.(parsed)
     setEditing(false)
   }
@@ -184,13 +185,18 @@ function SectionBlock({
   onDeleteSection: () => void
 }) {
   const total = items.reduce((sum, i) => sum + i.monthlyAmount, 0)
+  // RN's TextInput onBlur event carries no `.text` (its nativeEvent is a plain
+  // TargetedEvent) — the current value has to be tracked in state via onChangeText
+  // and read from there on blur instead.
+  const [name, setName] = useState(section.name)
 
   return (
     <View style={styles.card}>
       <View style={styles.sectionHeader}>
         <TextInput
-          defaultValue={section.name}
-          onBlur={(e) => e.nativeEvent.text.trim() && onRenameSection(e.nativeEvent.text.trim())}
+          value={name}
+          onChangeText={setName}
+          onBlur={() => name.trim() && onRenameSection(name.trim())}
           style={styles.sectionName}
         />
         <Text style={styles.sectionTotal}>{formatMoney(total)}/mo</Text>
@@ -221,20 +227,29 @@ function LineItemRow({
   onSave: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) => void
   onDelete: () => void
 }) {
+  // See SectionBlock's `name` state — onBlur's nativeEvent has no `.text`, so each
+  // field's current value is tracked via onChangeText and read from state on blur.
+  const [name, setName] = useState(item.name)
+  const [amount, setAmount] = useState(String(item.monthlyAmount))
+  const [miscInfo, setMiscInfo] = useState(item.miscInfo ?? '')
+  const [remarks, setRemarks] = useState(item.remarks ?? '')
+
   return (
     <View style={styles.itemRow}>
       <View style={styles.itemTopRow}>
         <TextInput
-          defaultValue={item.name}
+          value={name}
           placeholder="Name"
-          onBlur={(e) => onSave({ ...item, name: e.nativeEvent.text })}
+          onChangeText={setName}
+          onBlur={() => onSave({ ...item, name })}
           style={[styles.itemInput, { flex: 1.4 }]}
         />
         <TextInput
-          defaultValue={String(item.monthlyAmount)}
+          value={amount}
           placeholder="Monthly"
           keyboardType="decimal-pad"
-          onBlur={(e) => onSave({ ...item, monthlyAmount: Number(e.nativeEvent.text) || 0 })}
+          onChangeText={setAmount}
+          onBlur={() => onSave({ ...item, monthlyAmount: Number(amount) || 0 })}
           style={[styles.itemInput, { flex: 0.8 }]}
         />
         <Pressable onPress={onDelete} hitSlop={8}>
@@ -244,15 +259,17 @@ function LineItemRow({
       <Text style={styles.itemYearly}>{formatMoney(item.monthlyAmount * 12)}/yr</Text>
       <View style={styles.itemBottomRow}>
         <TextInput
-          defaultValue={item.miscInfo ?? ''}
+          value={miscInfo}
           placeholder="Misc info"
-          onBlur={(e) => onSave({ ...item, miscInfo: e.nativeEvent.text || null })}
+          onChangeText={setMiscInfo}
+          onBlur={() => onSave({ ...item, miscInfo: miscInfo || null })}
           style={[styles.itemInput, { flex: 1 }]}
         />
         <TextInput
-          defaultValue={item.remarks ?? ''}
+          value={remarks}
           placeholder="Remarks"
-          onBlur={(e) => onSave({ ...item, remarks: e.nativeEvent.text || null })}
+          onChangeText={setRemarks}
+          onBlur={() => onSave({ ...item, remarks: remarks || null })}
           style={[styles.itemInput, { flex: 1 }]}
         />
       </View>
