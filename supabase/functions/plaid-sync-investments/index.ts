@@ -136,6 +136,17 @@ Deno.serve(async (req: Request) => {
   } = await callerClient.auth.getUser()
   if (userError || !user) return json({ error: 'Invalid session' }, 401)
 
+  // The Crypto page's "Sync from bank" calls this with scope: 'crypto' so it only pulls
+  // in crypto-exchange holdings (e.g. SoFi Crypto) — not every brokerage account on the
+  // same Plaid items. The main Investments page omits scope and gets everything, as before.
+  let scope: 'crypto' | undefined
+  try {
+    const body = await req.json()
+    if (body?.scope === 'crypto') scope = 'crypto'
+  } catch {
+    // No body (or invalid JSON) — treat as unscoped, same as before this parameter existed.
+  }
+
   const serviceClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   const { data: items, error: itemsError } = await serviceClient
@@ -176,7 +187,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const holdings = await holdingsRes.json()
-    const plaidAccounts = ((holdings.accounts as PlaidInvestmentAccount[]) ?? []).filter(isInvestmentAccount)
+    let plaidAccounts = ((holdings.accounts as PlaidInvestmentAccount[]) ?? []).filter(isInvestmentAccount)
+    if (scope === 'crypto') plaidAccounts = plaidAccounts.filter((acc) => mapAccountType(acc.subtype) === 'crypto')
     if (plaidAccounts.length === 0) continue
 
     const accountIdMap = new Map<string, string>() // plaid account_id -> our internal id
@@ -251,6 +263,9 @@ Deno.serve(async (req: Request) => {
 
         const symbol = security?.ticker_symbol || security?.name || 'UNKNOWN'
         const assetType = mapAssetType(security?.type ?? null)
+        // Belt-and-suspenders: a crypto-scoped sync only ever touches crypto accounts
+        // (filtered above), but skip anything Plaid tags as a non-crypto asset within one too.
+        if (scope === 'crypto' && assetType !== 'crypto') return null
 
         let transactionType: 'buy' | 'sell' | 'dividend' | 'other'
         let quantity: number

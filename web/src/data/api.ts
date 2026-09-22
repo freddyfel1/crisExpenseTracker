@@ -533,13 +533,13 @@ export async function syncPlaidTransactions(): Promise<{ synced: number; removed
   return data
 }
 
-export async function syncPlaidInvestments(): Promise<{
+export async function syncPlaidInvestments(scope?: 'crypto'): Promise<{
   accounts: number
   transactions: number
   items: number
   skipped: number
 }> {
-  const { data, error } = await supabase.functions.invoke('plaid-sync-investments', { body: {} })
+  const { data, error } = await supabase.functions.invoke('plaid-sync-investments', { body: { scope } })
   if (error) throw error
   return data
 }
