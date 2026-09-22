@@ -159,7 +159,7 @@ export function useStore() {
     onSuccess: () => invalidate('budgetLineItems'),
   })
   const saveMonthlyIncome = useMutation({
-    mutationFn: (entry: { monthKey: string; monthlyIncome: number; otherIncome: number }) =>
+    mutationFn: (entry: { monthKey: string; monthlyIncome?: number; otherIncome?: number }) =>
       upsertMonthlyIncome(userId!, entry),
     onSuccess: () => invalidate('monthlyIncome'),
   })
@@ -236,13 +236,15 @@ export function useStore() {
 
     updateProfile: (patch: Partial<Profile>) => saveProfile.mutate(patch),
 
-    saveMonthlyIncome: (entry: { monthKey: string; monthlyIncome: number; otherIncome: number }) =>
+    saveMonthlyIncome: (entry: { monthKey: string; monthlyIncome?: number; otherIncome?: number }) =>
       saveMonthlyIncome.mutate(entry),
 
     addBudgetSection: (s: Partial<BudgetSection>) => saveBudgetSection.mutate(s),
+    isSavingBudgetSection: saveBudgetSection.isPending,
     deleteBudgetSection: (id: string) => removeBudgetSection.mutate(id),
     saveBudgetLineItem: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) =>
       saveBudgetLineItem.mutate(item),
+    isSavingBudgetLineItem: saveBudgetLineItem.isPending,
     deleteBudgetLineItem: (id: string) => removeBudgetLineItem.mutate(id),
     duplicateBudgetMonth: (
       fromSections: BudgetSection[],
@@ -252,6 +254,7 @@ export function useStore() {
     isDuplicatingBudgetMonth: duplicateBudgetMonth.isPending,
 
     saveSavingsGoal: (g: Partial<SavingsGoal> & { id?: string }) => saveSavingsGoal.mutate(g),
+    isSavingSavingsGoal: saveSavingsGoal.isPending,
     deleteSavingsGoal: (id: string) => removeSavingsGoal.mutate(id),
 
     saveInvestmentAccount: (a: Partial<InvestmentAccount> & { id?: string }) => saveInvestmentAccount.mutate(a),

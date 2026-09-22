@@ -19,8 +19,10 @@ export function BudgetPlanner() {
     budgetSections,
     budgetLineItems,
     addBudgetSection,
+    isSavingBudgetSection,
     deleteBudgetSection,
     saveBudgetLineItem,
+    isSavingBudgetLineItem,
     deleteBudgetLineItem,
     duplicateBudgetMonth,
     isDuplicatingBudgetMonth,
@@ -339,6 +341,7 @@ export function BudgetPlanner() {
               sortOrder: items.length,
             })
           }
+          isAddingItem={isSavingBudgetLineItem}
           onDeleteItem={deleteBudgetLineItem}
           onSaveItem={saveBudgetLineItem}
           onRenameSection={(name) =>
@@ -371,7 +374,8 @@ export function BudgetPlanner() {
 
       <button
         onClick={() => addBudgetSection({ name: 'New section', sortOrder: monthSections.length, monthKey: month })}
-        className="flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-soft)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+        disabled={isSavingBudgetSection}
+        className="flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-soft)] hover:border-[var(--primary)] hover:text-[var(--primary)] disabled:opacity-60"
       >
         <Plus size={15} /> Add section
       </button>
@@ -397,7 +401,8 @@ function SummaryStat({
   const toneClass = tone === 'warn' ? 'text-[var(--warn)]' : tone === 'good' ? 'text-[var(--primary)]' : 'text-[var(--ink)]'
 
   const commit = () => {
-    const parsed = Number(draft)
+    // Number('') is 0, not NaN — an emptied field must not silently save as $0.
+    const parsed = draft.trim() === '' ? NaN : Number(draft)
     if (!Number.isNaN(parsed)) onSave?.(parsed)
     setEditing(false)
   }
@@ -441,6 +446,7 @@ function SectionCard({
   isEmptySection,
   total,
   onAddItem,
+  isAddingItem,
   onDeleteItem,
   onSaveItem,
   onRenameSection,
@@ -457,6 +463,7 @@ function SectionCard({
   isEmptySection: boolean
   total: number
   onAddItem: () => void
+  isAddingItem: boolean
   onDeleteItem: (id: string) => void
   onSaveItem: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) => void
   onRenameSection: (name: string) => void
@@ -521,7 +528,8 @@ function SectionCard({
 
         <button
           onClick={onAddItem}
-          className="mt-3 flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--primary)] hover:underline"
+          disabled={isAddingItem}
+          className="mt-3 flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--primary)] hover:underline disabled:opacity-60"
         >
           <Plus size={14} /> Add line item
         </button>

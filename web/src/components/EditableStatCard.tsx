@@ -15,7 +15,8 @@ export function EditableStatCard({ label, value, sub, icon, onSave }: Props) {
   const [draft, setDraft] = useState(String(value))
 
   const commit = () => {
-    const parsed = Number(draft)
+    // Number('') is 0, not NaN — an emptied field must not silently save as $0.
+    const parsed = draft.trim() === '' ? NaN : Number(draft)
     if (!Number.isNaN(parsed)) onSave(parsed)
     setEditing(false)
   }

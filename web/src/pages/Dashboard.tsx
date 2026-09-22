@@ -69,14 +69,14 @@ export function Dashboard() {
           value={monthlyIncome}
           sub="tap to edit"
           icon={<Landmark size={16} className="text-[var(--text-soft)]" />}
-          onSave={(v) => saveMonthlyIncome({ monthKey: month, monthlyIncome: v, otherIncome })}
+          onSave={(v) => saveMonthlyIncome({ monthKey: month, monthlyIncome: v })}
         />
         <EditableStatCard
           label="Other income"
           value={otherIncome}
           sub="side income, etc. — tap to edit"
           icon={<Coins size={16} className="text-[var(--text-soft)]" />}
-          onSave={(v) => saveMonthlyIncome({ monthKey: month, monthlyIncome, otherIncome: v })}
+          onSave={(v) => saveMonthlyIncome({ monthKey: month, otherIncome: v })}
         />
         <StatCard
           label="Total income"

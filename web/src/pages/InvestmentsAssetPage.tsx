@@ -280,11 +280,13 @@ export function InvestmentsAssetPage({
   }
 
   const addTransactionForAccount = () => {
-    if (investmentAccounts.length === 0) {
+    // Must default to a page-relevant account, not just any account overall — otherwise
+    // this button can pre-select e.g. a brokerage account while on the Crypto page.
+    if (pageAccounts.length === 0) {
       window.alert('Add an account first.')
       return
     }
-    setEditingTransaction(emptyTransaction(investmentAccounts[0].id, defaultAssetType))
+    setEditingTransaction(emptyTransaction(pageAccounts[0].id, defaultAssetType))
   }
 
   return (

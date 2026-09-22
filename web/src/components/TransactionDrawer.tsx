@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trash2, X } from 'lucide-react'
 import { useStore } from '../data/store'
 import type { Transaction } from '../types'
@@ -28,9 +28,18 @@ export function TransactionDrawer({ id, onClose }: Props) {
   const isNew = id === 'new'
   const existing = transactions.find((t) => t.id === id)
   const [draft, setDraft] = useState<Transaction>(existing ?? emptyTransaction())
+  // Reseeds the draft only when the drawer switches to a different transaction (`id`
+  // changes), not on every background refetch — `existing` is a fresh object literal
+  // every refetch (see toTransaction in api.ts), so depending on it directly would
+  // silently overwrite an in-progress edit whenever this transaction changed elsewhere
+  // (or just re-synced) while the drawer was open.
+  const seededIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    setDraft(existing ?? emptyTransaction())
+    if (seededIdRef.current !== id) {
+      setDraft(existing ?? emptyTransaction())
+      seededIdRef.current = id
+    }
   }, [id, existing])
 
   useEffect(() => {
