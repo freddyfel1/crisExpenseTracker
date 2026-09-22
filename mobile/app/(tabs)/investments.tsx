@@ -7,7 +7,8 @@ export default function InvestmentsScreen() {
       description="ETFs and other holdings you track by hand. Tracking crypto? Visit the Crypto screen."
       isIncluded={(assetType) => assetType !== 'crypto'}
       defaultAssetType="etf"
-      defaultAccountType="brokerage"
+      isDefaultAccountType={(accountType) => accountType !== 'crypto'}
+      newAccountType="brokerage"
       pdfSubtitle="Investments"
       emptyHint="No investment accounts yet — add one to start logging buys and sells."
       sectionLabel="Stocks, ETFs & other"

@@ -39,7 +39,8 @@ export default function Home() {
   const categoryById = new Map((categories.data ?? []).map((c) => [c.id, c]))
 
   const commitIncome = () => {
-    const parsed = Number(incomeDraft)
+    // Number('') is 0, not NaN — an emptied field must not silently save as $0.
+    const parsed = incomeDraft.trim() === '' ? NaN : Number(incomeDraft)
     if (!Number.isNaN(parsed)) updateProfile.mutate({ monthlyIncome: parsed })
     setEditingIncome(false)
   }

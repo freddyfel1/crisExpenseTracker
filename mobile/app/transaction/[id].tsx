@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -30,9 +30,16 @@ export default function TransactionDetail() {
   const existing = transactions.data?.find((t) => t.id === id)
   const [draft, setDraft] = useState<Transaction | null>(existing ?? null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  // Seeds the draft once, the first time `existing` loads — resyncing on every later
+  // refetch would silently overwrite whatever the user is mid-typing whenever this same
+  // transaction changes server-side (edited on web, or via another sync) while open here.
+  const hasSeededDraft = useRef(false)
 
   useEffect(() => {
-    if (existing) setDraft(existing)
+    if (existing && !hasSeededDraft.current) {
+      setDraft(existing)
+      hasSeededDraft.current = true
+    }
   }, [existing])
 
   useEffect(() => {

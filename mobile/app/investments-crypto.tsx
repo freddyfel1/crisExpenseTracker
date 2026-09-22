@@ -12,7 +12,8 @@ export default function InvestmentsCryptoScreen() {
       description="Crypto holdings — log them by hand."
       isIncluded={(assetType) => assetType === 'crypto'}
       defaultAssetType="crypto"
-      defaultAccountType="crypto"
+      isDefaultAccountType={(accountType) => accountType === 'crypto'}
+      newAccountType="crypto"
       pdfSubtitle="Crypto"
       emptyHint="No crypto holdings yet — add a transaction to get started."
     />
