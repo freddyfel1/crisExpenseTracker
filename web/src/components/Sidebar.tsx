@@ -13,6 +13,7 @@ import {
   Landmark,
   Upload,
   TrendingUp,
+  Coins,
 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { firstName } from '../utils/format'
@@ -31,7 +32,12 @@ const NAV_ITEMS = [
   },
   { to: '/categories', label: 'Categories', icon: Tags },
   { to: '/savings-goals', label: 'Savings Goals', icon: PiggyBank },
-  { to: '/investments', label: 'Investments', icon: TrendingUp },
+  {
+    to: '/investments',
+    label: 'Investments',
+    icon: TrendingUp,
+    children: [{ to: '/investments/crypto', label: 'Crypto', icon: Coins }],
+  },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
   { to: '/how-to', label: 'How To', icon: HelpCircle },
