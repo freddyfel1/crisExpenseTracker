@@ -96,9 +96,16 @@ export function InvestmentsAssetPage({
     () => investmentTransactions.filter((t) => isIncluded(t.assetType)),
     [investmentTransactions, isIncluded],
   )
+  // An account belongs here either because it already has a matching-type transaction
+  // (the mixed-account case), or because it was created *as* this page's default account
+  // type — otherwise a brand-new account added from this page, with no transactions yet,
+  // would show up nowhere until its first transaction was logged.
   const pageAccounts = useMemo(
-    () => investmentAccounts.filter((a) => pageTransactions.some((t) => t.accountId === a.id)),
-    [investmentAccounts, pageTransactions],
+    () =>
+      investmentAccounts.filter(
+        (a) => a.accountType === defaultAccountType || pageTransactions.some((t) => t.accountId === a.id),
+      ),
+    [investmentAccounts, pageTransactions, defaultAccountType],
   )
 
   const syncMutation = useMutation({

@@ -91,22 +91,34 @@ export function Investments() {
     (Partial<InvestmentTransaction> & { accountId: string }) | null
   >(null)
 
-  const invested = totalInvested(investmentTransactions, investmentAccounts.map((a) => a.id))
+  // Crypto now has its own dedicated page (see InvestmentsCrypto) — accounts created
+  // there are typed 'crypto' and shouldn't also show up here. A brokerage account that
+  // happens to hold a little crypto alongside its stocks still shows here in full,
+  // unaffected; only accounts whose whole *type* is crypto are excluded.
+  const nonCryptoAccounts = useMemo(
+    () => investmentAccounts.filter((a) => a.accountType !== 'crypto'),
+    [investmentAccounts],
+  )
+
+  const invested = totalInvested(investmentTransactions, nonCryptoAccounts.map((a) => a.id))
   const allHoldings = useMemo(
-    () => investmentAccounts.flatMap((a) => holdingsForAccount(investmentTransactions, a.id)),
-    [investmentAccounts, investmentTransactions],
+    () => nonCryptoAccounts.flatMap((a) => holdingsForAccount(investmentTransactions, a.id)),
+    [nonCryptoAccounts, investmentTransactions],
   )
   const holdingCount = allHoldings.length
   const portfolioValue = marketValue(allHoldings, investmentPrices)
   const unrealizedGain = portfolioValue - invested
 
-  // Every symbol currently logged, regardless of account — Finnhub is queried once per
+  // Every symbol currently logged on a non-crypto account — Finnhub is queried once per
   // symbol, not once per account, since the same stock costs the same API call either way.
+  const nonCryptoAccountIds = useMemo(() => new Set(nonCryptoAccounts.map((a) => a.id)), [nonCryptoAccounts])
   const heldSymbols = useMemo(() => {
     const bySymbol = new Map<string, AssetType>()
-    for (const t of investmentTransactions) bySymbol.set(t.symbol, t.assetType)
+    for (const t of investmentTransactions) {
+      if (nonCryptoAccountIds.has(t.accountId)) bySymbol.set(t.symbol, t.assetType)
+    }
     return [...bySymbol.entries()].map(([symbol, assetType]) => ({ symbol, assetType }))
-  }, [investmentTransactions])
+  }, [investmentTransactions, nonCryptoAccountIds])
 
   const handleUpdatePrices = async () => {
     if (heldSymbols.length === 0) {
@@ -130,11 +142,11 @@ export function Investments() {
   // the PDF is a full record of the portfolio, not just what's currently expanded.
   const accountsForExport = useMemo(
     () =>
-      investmentAccounts.map((account) => ({
+      nonCryptoAccounts.map((account) => ({
         account,
         holdings: holdingsForAccount(investmentTransactions, account.id),
       })),
-    [investmentAccounts, investmentTransactions],
+    [nonCryptoAccounts, investmentTransactions],
   )
 
   const exportPdf = async () => {
@@ -158,7 +170,7 @@ export function Investments() {
       doc.text(
         `Invested ${formatMoney(invested)}   Market value ${formatMoney(portfolioValue)}   ` +
           `Gain/loss ${unrealizedGain >= 0 ? '+' : ''}${formatMoney(unrealizedGain)}   ` +
-          `${investmentAccounts.length} account${investmentAccounts.length === 1 ? '' : 's'}, ` +
+          `${nonCryptoAccounts.length} account${nonCryptoAccounts.length === 1 ? '' : 's'}, ` +
           `${holdingCount} holding${holdingCount === 1 ? '' : 's'}`,
         margin,
         88,
@@ -229,9 +241,6 @@ export function Investments() {
     }
   }
 
-  const cryptoAccounts = investmentAccounts.filter((a) => a.accountType === 'crypto')
-  const nonCryptoAccounts = investmentAccounts.filter((a) => a.accountType !== 'crypto')
-
   const saveAccount = () => {
     if (!editingAccount || !editingAccount.name?.trim()) return
     saveInvestmentAccount({ ...editingAccount, name: editingAccount.name.trim() })
@@ -250,11 +259,15 @@ export function Investments() {
         <div>
           <h1 className="font-display text-[26px] text-[var(--ink)]">Investments</h1>
           <p className="text-[13px] text-[var(--text-soft)]">
-            ETFs, crypto, and other holdings — log them by hand, or{' '}
+            ETFs and other holdings — log them by hand, or{' '}
             <Link to="/transactions/connect-bank" className="font-medium text-[var(--primary)] hover:underline">
               connect a bank
             </Link>{' '}
-            that supports Plaid Investments to sync automatically.
+            that supports Plaid Investments to sync automatically. Tracking crypto?{' '}
+            <Link to="/investments/crypto" className="font-medium text-[var(--primary)] hover:underline">
+              Visit the Crypto page
+            </Link>
+            .
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -317,7 +330,7 @@ export function Investments() {
         />
         <StatCard
           label="Accounts"
-          value={String(investmentAccounts.length)}
+          value={String(nonCryptoAccounts.length)}
           icon={<Landmark size={16} className="text-[var(--text-soft)]" />}
         />
         <StatCard
@@ -333,10 +346,8 @@ export function Investments() {
         </Card>
       )}
 
-      {investmentAccounts.length === 0 && (
-        <p className="text-[13px] text-[var(--text-soft)]">
-          No investment accounts yet — add one to start logging ETF or crypto buys and sells.
-        </p>
+      {nonCryptoAccounts.length === 0 && (
+        <p className="text-[13px] text-[var(--text-soft)]">No investment accounts yet — add one to start logging ETF buys and sells.</p>
       )}
 
       {nonCryptoAccounts.length > 0 && (
@@ -365,29 +376,6 @@ export function Investments() {
         </div>
       )}
 
-      {cryptoAccounts.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">Crypto</h2>
-          {cryptoAccounts.map((account) => (
-            <AccountCard
-              key={account.id}
-              account={account}
-              transactions={investmentTransactions.filter((t) => t.accountId === account.id)}
-              prices={investmentPrices}
-              onEditAccount={() => setEditingAccount({ ...account })}
-              onDeleteAccount={() => {
-                if (window.confirm(`Delete "${account.name}" and all its transactions? This cannot be undone.`))
-                  deleteInvestmentAccount(account.id)
-              }}
-              onAddTransaction={() => setEditingTransaction(emptyTransaction(account.id))}
-              onEditTransaction={(t) => setEditingTransaction({ ...t })}
-              onDeleteTransaction={(id) => {
-                if (window.confirm('Delete this transaction? This cannot be undone.')) deleteInvestmentTransaction(id)
-              }}
-            />
-          ))}
-        </div>
-      )}
 
       {editingAccount && (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/30 p-4">
