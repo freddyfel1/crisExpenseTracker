@@ -19,6 +19,7 @@ function Gate() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="investments-crypto" options={{ headerShown: true, title: 'Crypto' }} />
       <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Transaction' }} />
       <Stack.Screen
         name="investment-account/[id]"
