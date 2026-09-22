@@ -100,10 +100,18 @@ export function Investments() {
     [investmentAccounts],
   )
 
-  const invested = totalInvested(investmentTransactions, nonCryptoAccounts.map((a) => a.id))
+  // Excludes crypto by transaction, not just by account — a brokerage account that holds
+  // both stocks and a little crypto still shows here, but only its non-crypto rows; the
+  // crypto ones belong exclusively on the Crypto page (see InvestmentsAssetPage).
+  const nonCryptoTransactions = useMemo(
+    () => investmentTransactions.filter((t) => t.assetType !== 'crypto'),
+    [investmentTransactions],
+  )
+
+  const invested = totalInvested(nonCryptoTransactions, nonCryptoAccounts.map((a) => a.id))
   const allHoldings = useMemo(
-    () => nonCryptoAccounts.flatMap((a) => holdingsForAccount(investmentTransactions, a.id)),
-    [nonCryptoAccounts, investmentTransactions],
+    () => nonCryptoAccounts.flatMap((a) => holdingsForAccount(nonCryptoTransactions, a.id)),
+    [nonCryptoAccounts, nonCryptoTransactions],
   )
   const holdingCount = allHoldings.length
   const portfolioValue = marketValue(allHoldings, investmentPrices)
@@ -114,11 +122,11 @@ export function Investments() {
   const nonCryptoAccountIds = useMemo(() => new Set(nonCryptoAccounts.map((a) => a.id)), [nonCryptoAccounts])
   const heldSymbols = useMemo(() => {
     const bySymbol = new Map<string, AssetType>()
-    for (const t of investmentTransactions) {
+    for (const t of nonCryptoTransactions) {
       if (nonCryptoAccountIds.has(t.accountId)) bySymbol.set(t.symbol, t.assetType)
     }
     return [...bySymbol.entries()].map(([symbol, assetType]) => ({ symbol, assetType }))
-  }, [investmentTransactions, nonCryptoAccountIds])
+  }, [nonCryptoTransactions, nonCryptoAccountIds])
 
   const handleUpdatePrices = async () => {
     if (heldSymbols.length === 0) {
@@ -144,9 +152,9 @@ export function Investments() {
     () =>
       nonCryptoAccounts.map((account) => ({
         account,
-        holdings: holdingsForAccount(investmentTransactions, account.id),
+        holdings: holdingsForAccount(nonCryptoTransactions, account.id),
       })),
-    [nonCryptoAccounts, investmentTransactions],
+    [nonCryptoAccounts, nonCryptoTransactions],
   )
 
   const exportPdf = async () => {
@@ -359,7 +367,7 @@ export function Investments() {
             <AccountCard
               key={account.id}
               account={account}
-              transactions={investmentTransactions.filter((t) => t.accountId === account.id)}
+              transactions={nonCryptoTransactions.filter((t) => t.accountId === account.id)}
               prices={investmentPrices}
               onEditAccount={() => setEditingAccount({ ...account })}
               onDeleteAccount={() => {

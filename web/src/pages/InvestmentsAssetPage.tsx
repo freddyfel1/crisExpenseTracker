@@ -108,8 +108,12 @@ export function InvestmentsAssetPage({
     [investmentAccounts, pageTransactions, defaultAccountType],
   )
 
+  // Scopes the sync to crypto-exchange accounts only (e.g. SoFi Crypto) when this page is
+  // the Crypto page, so it never pulls in brokerage holdings from the same Plaid item.
+  const syncScope = defaultAssetType === 'crypto' ? 'crypto' : undefined
+
   const syncMutation = useMutation({
-    mutationFn: syncPlaidInvestments,
+    mutationFn: () => syncPlaidInvestments(syncScope),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['investmentAccounts', session?.user.id] })
       queryClient.invalidateQueries({ queryKey: ['investmentTransactions', session?.user.id] })
