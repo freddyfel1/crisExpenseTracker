@@ -42,7 +42,7 @@ export function SignInScreen() {
           <View style={styles.logo}>
             <Wallet size={20} color="#fff" />
           </View>
-          <Text style={styles.title}>crisExpenseTracker</Text>
+          <Text style={styles.title}>Budget Planner Plus</Text>
         </View>
 
         <TextInput
