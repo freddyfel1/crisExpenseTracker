@@ -1,4 +1,4 @@
-import type { AssetType, InvestmentTransaction, Transaction } from '../types'
+import type { AssetType, BudgetLineItem, BudgetSection, InvestmentTransaction, MonthlyIncome, Transaction } from '../types'
 
 export const monthKey = (iso: string): string => iso.slice(0, 7)
 export const currentMonthKey = (): string => new Date().toISOString().slice(0, 7)
@@ -86,3 +86,79 @@ export const totalInvested = (transactions: InvestmentTransaction[], accountIds:
 // whose live price hasn't been fetched yet (or couldn't be matched by Finnhub).
 export const marketValue = (holdings: Holding[], prices: Record<string, number>): number =>
   holdings.reduce((sum, h) => sum + (prices[h.symbol] != null ? prices[h.symbol] * h.quantity : h.costBasis), 0)
+
+const monthsBetween = (a: string, b: string): number => {
+  const [ay, am] = a.split('-').map(Number)
+  const [by, bm] = b.split('-').map(Number)
+  return Math.abs((ay - by) * 12 + (am - bm))
+}
+
+// Mirrors web/src/data/selectors.ts monthlyIncomeEntryForMonth — a month with no
+// monthly_income row yet isn't "no income", it just hasn't been touched, so fall back to
+// the nearest month that does have a row (preferring the closest earlier month, then the
+// closest later one), capped to within a year so a single recorded month doesn't get
+// copied across a decade of unrelated history.
+const MAX_CARRY_FORWARD_MONTHS = 12
+
+export const monthlyIncomeEntryForMonth = (
+  entries: MonthlyIncome[],
+  month: string,
+): { monthlyIncome: number; otherIncome: number } => {
+  const exact = entries.find((e) => e.monthKey === month)
+  if (exact) return { monthlyIncome: exact.monthlyIncome, otherIncome: exact.otherIncome }
+
+  const nearby = entries.filter((e) => monthsBetween(e.monthKey, month) <= MAX_CARRY_FORWARD_MONTHS)
+
+  const earlier = nearby.filter((e) => e.monthKey < month).sort((a, b) => b.monthKey.localeCompare(a.monthKey))[0]
+  if (earlier) return { monthlyIncome: earlier.monthlyIncome, otherIncome: earlier.otherIncome }
+
+  const later = nearby.filter((e) => e.monthKey > month).sort((a, b) => a.monthKey.localeCompare(b.monthKey))[0]
+  if (later) return { monthlyIncome: later.monthlyIncome, otherIncome: later.otherIncome }
+
+  return { monthlyIncome: 0, otherIncome: 0 }
+}
+
+export const incomeForMonth = (entries: MonthlyIncome[], month: string): number => {
+  const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(entries, month)
+  return monthlyIncome + otherIncome
+}
+
+export const groupBudgetItemsBySection = (items: BudgetLineItem[]): Map<string, BudgetLineItem[]> => {
+  const map = new Map<string, BudgetLineItem[]>()
+  for (const item of items) {
+    const list = map.get(item.sectionId) ?? []
+    list.push(item)
+    map.set(item.sectionId, list)
+  }
+  return map
+}
+
+export interface BudgetStats {
+  income: number
+  expenses: number
+  savings: number
+  difference: number
+  balance: number
+}
+
+// A "savings" section is identified by name (see the app's own convention) rather than a
+// dedicated flag, so its line items count toward `savings` instead of `expenses` — mirrors
+// web/src/data/selectors.ts budgetStatsForMonth exactly.
+export function budgetStatsForMonth(
+  month: string,
+  budgetSections: BudgetSection[],
+  itemsBySection: Map<string, BudgetLineItem[]>,
+  monthlyIncomes: MonthlyIncome[],
+): BudgetStats {
+  const sections = budgetSections.filter((s) => s.monthKey === month)
+  const savingsSection = sections.find((s) => s.name.toLowerCase().includes('saving'))
+  const savings = (itemsBySection.get(savingsSection?.id ?? '') ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0)
+  const expenses = sections
+    .filter((s) => s.id !== savingsSection?.id)
+    .reduce((sum, s) => sum + (itemsBySection.get(s.id) ?? []).reduce((a, i) => a + i.monthlyAmount, 0), 0)
+  const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(monthlyIncomes, month)
+  const income = monthlyIncome + otherIncome
+  const difference = income - expenses
+  const balance = difference - savings
+  return { income, expenses, savings, difference, balance }
+}

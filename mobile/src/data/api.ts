@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { currentMonthKey } from './selectors'
 import type {
   AssetType,
   BudgetLineItem,
@@ -6,6 +7,7 @@ import type {
   Category,
   InvestmentAccount,
   InvestmentTransaction,
+  MonthlyIncome,
   Profile,
   Transaction,
 } from '../types'
@@ -86,7 +88,6 @@ export async function fetchProfile(userId: string): Promise<Profile> {
     notifyBudgetAlerts: data.notify_budget_alerts,
     notifyWeeklySummary: data.notify_weekly_summary,
     notifyReceiptSync: data.notify_receipt_sync,
-    monthlyIncome: Number(data.monthly_income),
     monthlySavings: Number(data.monthly_savings),
   }
 }
@@ -100,33 +101,113 @@ export async function updateProfile(userId: string, patch: Partial<Profile>) {
       ...(patch.notifyBudgetAlerts !== undefined && { notify_budget_alerts: patch.notifyBudgetAlerts }),
       ...(patch.notifyWeeklySummary !== undefined && { notify_weekly_summary: patch.notifyWeeklySummary }),
       ...(patch.notifyReceiptSync !== undefined && { notify_receipt_sync: patch.notifyReceiptSync }),
-      ...(patch.monthlyIncome !== undefined && { monthly_income: patch.monthlyIncome }),
       ...(patch.monthlySavings !== undefined && { monthly_savings: patch.monthlySavings }),
     })
     .eq('id', userId)
   if (error) throw error
 }
 
+export async function fetchMonthlyIncome(): Promise<MonthlyIncome[]> {
+  const { data, error } = await supabase.from('monthly_income').select('*').order('month_key')
+  if (error) throw error
+  return (
+    data as { id: string; month_key: string; monthly_income: number; other_income: number }[]
+  ).map((r) => ({
+    id: r.id,
+    monthKey: r.month_key,
+    monthlyIncome: Number(r.monthly_income),
+    otherIncome: Number(r.other_income),
+  }))
+}
+
+export async function upsertMonthlyIncome(
+  userId: string,
+  entry: { monthKey: string; monthlyIncome?: number; otherIncome?: number },
+) {
+  // Only the columns actually present in the payload get written by Postgres's
+  // ON CONFLICT DO UPDATE — omitting a field (rather than re-sending whatever value
+  // the caller last rendered) means two near-simultaneous edits to monthlyIncome and
+  // otherIncome for the same month can never clobber each other with a stale value.
+  const { error } = await supabase.from('monthly_income').upsert(
+    {
+      user_id: userId,
+      month_key: entry.monthKey,
+      ...(entry.monthlyIncome !== undefined && { monthly_income: entry.monthlyIncome }),
+      ...(entry.otherIncome !== undefined && { other_income: entry.otherIncome }),
+    },
+    { onConflict: 'user_id,month_key' },
+  )
+  if (error) throw error
+}
+
 export async function fetchBudgetSections(): Promise<BudgetSection[]> {
   const { data, error } = await supabase.from('budget_sections').select('*').order('sort_order')
   if (error) throw error
-  return (data as { id: string; name: string; sort_order: number }[]).map((s) => ({
+  return (data as { id: string; name: string; sort_order: number; month_key: string }[]).map((s) => ({
     id: s.id,
     name: s.name,
     sortOrder: s.sort_order,
+    monthKey: s.month_key,
   }))
 }
 
 export async function upsertBudgetSection(userId: string, s: Partial<BudgetSection> & { id?: string }) {
   const { error } = await supabase
     .from('budget_sections')
-    .upsert({ id: s.id, user_id: userId, name: s.name, sort_order: s.sortOrder ?? 0 })
+    .upsert({ id: s.id, user_id: userId, name: s.name, sort_order: s.sortOrder ?? 0, month_key: s.monthKey })
   if (error) throw error
 }
 
 export async function deleteBudgetSection(id: string) {
   const { error } = await supabase.from('budget_sections').delete().eq('id', id)
   if (error) throw error
+}
+
+/** Copies a month's sections + line items forward/backward into a month that has no data yet. */
+export async function duplicateBudgetMonth(
+  userId: string,
+  fromSections: BudgetSection[],
+  fromItemsBySection: Map<string, BudgetLineItem[]>,
+  toMonthKey: string,
+) {
+  if (fromSections.length === 0) return
+
+  const { data: newSections, error: sectionsError } = await supabase
+    .from('budget_sections')
+    .insert(
+      fromSections.map((s) => ({
+        user_id: userId,
+        name: s.name,
+        sort_order: s.sortOrder,
+        month_key: toMonthKey,
+      })),
+    )
+    .select()
+  if (sectionsError) throw sectionsError
+
+  const idMap = new Map<string, string>()
+  fromSections.forEach((s, i) => idMap.set(s.id, newSections![i].id))
+
+  // Only the month the user is actually editing keeps real amounts — every
+  // duplicated month (past or future) starts blank so it's not just a copy
+  // of whatever the source month happened to have.
+  const clearAmounts = toMonthKey !== currentMonthKey()
+
+  const newItems = fromSections.flatMap((s) =>
+    (fromItemsBySection.get(s.id) ?? []).map((item) => ({
+      user_id: userId,
+      section_id: idMap.get(s.id)!,
+      name: item.name,
+      monthly_amount: clearAmounts ? 0 : item.monthlyAmount,
+      misc_info: item.miscInfo,
+      remarks: item.remarks,
+      sort_order: item.sortOrder,
+    })),
+  )
+  if (newItems.length > 0) {
+    const { error: itemsError } = await supabase.from('budget_line_items').insert(newItems)
+    if (itemsError) throw itemsError
+  }
 }
 
 export async function fetchBudgetLineItems(): Promise<BudgetLineItem[]> {
