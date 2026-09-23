@@ -397,7 +397,10 @@ function IncomeMonthRow({
   const [draft, setDraft] = useState(String(total))
 
   const commit = () => {
-    const parsed = Number(draft)
+    // Number('') is 0, not NaN — an emptied field must not silently save as $0, and
+    // here that would go further and save a *negative* monthlyIncome (0 - fallbackOther)
+    // whenever other income is nonzero.
+    const parsed = draft.trim() === '' ? NaN : Number(draft)
     if (!Number.isNaN(parsed)) onSave(mKey, parsed - fallbackOther, fallbackOther)
     setEditing(false)
   }

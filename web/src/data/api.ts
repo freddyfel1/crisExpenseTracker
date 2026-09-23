@@ -161,14 +161,18 @@ export async function fetchMonthlyIncome(): Promise<MonthlyIncome[]> {
 
 export async function upsertMonthlyIncome(
   userId: string,
-  entry: { monthKey: string; monthlyIncome: number; otherIncome: number },
+  entry: { monthKey: string; monthlyIncome?: number; otherIncome?: number },
 ) {
+  // Only the columns actually present in the payload get written by Postgres's
+  // ON CONFLICT DO UPDATE — omitting a field (rather than re-sending whatever value
+  // the caller last rendered) means two near-simultaneous edits to monthlyIncome and
+  // otherIncome for the same month can never clobber each other with a stale value.
   const { error } = await supabase.from('monthly_income').upsert(
     {
       user_id: userId,
       month_key: entry.monthKey,
-      monthly_income: entry.monthlyIncome,
-      other_income: entry.otherIncome,
+      ...(entry.monthlyIncome !== undefined && { monthly_income: entry.monthlyIncome }),
+      ...(entry.otherIncome !== undefined && { other_income: entry.otherIncome }),
     },
     { onConflict: 'user_id,month_key' },
   )

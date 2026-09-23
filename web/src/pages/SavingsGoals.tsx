@@ -13,7 +13,7 @@ function transferredAmount(goal: SavingsGoal, transactions: Transaction[]) {
 }
 
 export function SavingsGoals() {
-  const { savingsGoals, categories, transactions, saveSavingsGoal, deleteSavingsGoal } = useStore()
+  const { savingsGoals, categories, transactions, saveSavingsGoal, isSavingSavingsGoal, deleteSavingsGoal } = useStore()
 
   const goals = [...savingsGoals].sort((a, b) => a.sortOrder - b.sortOrder)
   const totalTarget = goals.reduce((sum, g) => sum + g.targetAmount, 0)
@@ -70,7 +70,8 @@ export function SavingsGoals() {
 
       <button
         onClick={() => saveSavingsGoal({ name: 'New goal', targetAmount: 0, currentAmount: 0, sortOrder: goals.length })}
-        className="flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-soft)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+        disabled={isSavingSavingsGoal}
+        className="flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-soft)] hover:border-[var(--primary)] hover:text-[var(--primary)] disabled:opacity-60"
       >
         <Plus size={15} /> Add goal
       </button>

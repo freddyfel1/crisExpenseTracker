@@ -1,20 +1,21 @@
 import { ActivityIndicator, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCategories, useProfile, useTransactions, useUpdateProfile } from '../../src/hooks/useAppData'
-import { currentMonthKey, spendByCategory, totalSpend, transactionsForMonth } from '../../src/data/selectors'
+import { useCategories, useMonthlyIncomes, useSaveMonthlyIncome, useTransactions } from '../../src/hooks/useAppData'
+import { monthlyIncomeEntryForMonth, spendByCategory, totalSpend, transactionsForMonth } from '../../src/data/selectors'
+import { usePeriod } from '../../src/data/period'
 import { formatMoney, monthKeyLabel } from '../../src/utils/format'
 import { colors } from '../../src/theme'
+import { MonthPicker } from '../../src/components/MonthPicker'
 
 export default function Home() {
   const transactions = useTransactions()
   const categories = useCategories()
-  const profile = useProfile()
-  const updateProfile = useUpdateProfile()
+  const monthlyIncomes = useMonthlyIncomes()
+  const saveMonthlyIncome = useSaveMonthlyIncome()
   const queryClient = useQueryClient()
+  const { month } = usePeriod()
   const [refreshing, setRefreshing] = useState(false)
-  const [editingIncome, setEditingIncome] = useState(false)
-  const [incomeDraft, setIncomeDraft] = useState('')
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -22,7 +23,7 @@ export default function Home() {
     setRefreshing(false)
   }, [queryClient])
 
-  if (transactions.isLoading || categories.isLoading || profile.isLoading) {
+  if (transactions.isLoading || categories.isLoading || monthlyIncomes.isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
@@ -30,20 +31,13 @@ export default function Home() {
     )
   }
 
-  const month = currentMonthKey()
   const monthTxns = transactionsForMonth(transactions.data ?? [], month)
   const spend = spendByCategory(monthTxns)
   const spent = totalSpend(monthTxns)
-  const income = profile.data?.monthlyIncome ?? 0
+  const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(monthlyIncomes.data ?? [], month)
+  const income = monthlyIncome + otherIncome
   const difference = income - spent
   const categoryById = new Map((categories.data ?? []).map((c) => [c.id, c]))
-
-  const commitIncome = () => {
-    // Number('') is 0, not NaN — an emptied field must not silently save as $0.
-    const parsed = incomeDraft.trim() === '' ? NaN : Number(incomeDraft)
-    if (!Number.isNaN(parsed)) updateProfile.mutate({ monthlyIncome: parsed })
-    setEditingIncome(false)
-  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -52,33 +46,20 @@ export default function Home() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <Text style={styles.title}>Dashboard</Text>
-        <Text style={styles.subtitle}>{monthKeyLabel(month)}</Text>
+        <Text style={styles.subtitle}>Your financial position for {monthKeyLabel(month)}</Text>
+        <MonthPicker />
 
         <View style={styles.statRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>INCOME</Text>
-            {editingIncome ? (
-              <TextInput
-                autoFocus
-                style={[styles.statValue, styles.statInput]}
-                keyboardType="decimal-pad"
-                value={incomeDraft}
-                onChangeText={setIncomeDraft}
-                onBlur={commitIncome}
-                onSubmitEditing={commitIncome}
-              />
-            ) : (
-              <Pressable
-                onPress={() => {
-                  setIncomeDraft(String(income))
-                  setEditingIncome(true)
-                }}
-              >
-                <Text style={styles.statValue}>{formatMoney(income)}</Text>
-              </Pressable>
-            )}
-            <Text style={styles.statSub}>{editingIncome ? 'editing…' : 'tap to edit'}</Text>
-          </View>
+          <EditableStat
+            label="INCOME"
+            value={monthlyIncome}
+            onSave={(v) => saveMonthlyIncome.mutate({ monthKey: month, monthlyIncome: v })}
+          />
+          <EditableStat
+            label="OTHER INCOME"
+            value={otherIncome}
+            onSave={(v) => saveMonthlyIncome.mutate({ monthKey: month, otherIncome: v })}
+          />
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>TOTAL EXPENSE</Text>
             <Text style={styles.statValue}>{formatMoney(spent)}</Text>
@@ -113,6 +94,45 @@ export default function Home() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  )
+}
+
+function EditableStat({ label, value, onSave }: { label: string; value: number; onSave: (v: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(String(value))
+
+  const commit = () => {
+    // Number('') is 0, not NaN — an emptied field must not silently save as $0.
+    const parsed = draft.trim() === '' ? NaN : Number(draft)
+    if (!Number.isNaN(parsed)) onSave(parsed)
+    setEditing(false)
+  }
+
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statLabel}>{label}</Text>
+      {editing ? (
+        <TextInput
+          autoFocus
+          style={[styles.statValue, styles.statInput]}
+          keyboardType="decimal-pad"
+          value={draft}
+          onChangeText={setDraft}
+          onBlur={commit}
+          onSubmitEditing={commit}
+        />
+      ) : (
+        <Pressable
+          onPress={() => {
+            setDraft(String(value))
+            setEditing(true)
+          }}
+        >
+          <Text style={styles.statValue}>{formatMoney(value)}</Text>
+        </Pressable>
+      )}
+      <Text style={styles.statSub}>{editing ? 'editing…' : 'tap to edit'}</Text>
+    </View>
   )
 }
 

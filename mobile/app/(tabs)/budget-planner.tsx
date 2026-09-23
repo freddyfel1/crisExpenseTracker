@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Plus, Trash2 } from 'lucide-react-native'
 import {
@@ -6,14 +6,17 @@ import {
   useBudgetSections,
   useDeleteBudgetLineItem,
   useDeleteBudgetSection,
-  useProfile,
+  useDuplicateBudgetMonth,
+  useMonthlyIncomes,
   useSaveBudgetLineItem,
   useSaveBudgetSection,
-  useUpdateProfile,
 } from '../../src/hooks/useAppData'
+import { budgetStatsForMonth, groupBudgetItemsBySection } from '../../src/data/selectors'
+import { usePeriod } from '../../src/data/period'
 import type { BudgetLineItem, BudgetSection } from '../../src/types'
 import { formatMoney } from '../../src/utils/format'
 import { colors } from '../../src/theme'
+import { MonthPicker } from '../../src/components/MonthPicker'
 
 function confirmDelete(message: string, onConfirm: () => void) {
   if (Platform.OS === 'web') {
@@ -27,16 +30,40 @@ function confirmDelete(message: string, onConfirm: () => void) {
 }
 
 export default function BudgetPlannerScreen() {
-  const profile = useProfile()
+  const monthlyIncomes = useMonthlyIncomes()
   const sections = useBudgetSections()
   const lineItems = useBudgetLineItems()
-  const updateProfile = useUpdateProfile()
   const saveSection = useSaveBudgetSection()
   const deleteSection = useDeleteBudgetSection()
   const saveItem = useSaveBudgetLineItem()
   const deleteItem = useDeleteBudgetLineItem()
+  const duplicateBudgetMonth = useDuplicateBudgetMonth()
+  const { month } = usePeriod()
 
-  if (profile.isLoading || sections.isLoading || lineItems.isLoading) {
+  const allSections = sections.data ?? []
+  const items = lineItems.data ?? []
+  const itemsBySection = useMemo(() => groupBudgetItemsBySection(items), [items])
+  const monthSections = useMemo(
+    () => allSections.filter((s) => s.monthKey === month).sort((a, b) => a.sortOrder - b.sortOrder),
+    [allSections, month],
+  )
+
+  // The first time a month with no plan yet is opened, carry the nearest month's
+  // sections/line items forward so the user edits amounts rather than rebuilding the
+  // whole spreadsheet from scratch — mirrors web/src/pages/BudgetPlanner.tsx.
+  const duplicateRequestedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (sections.isLoading || lineItems.isLoading) return
+    if (monthSections.length > 0 || duplicateRequestedFor.current === month) return
+    const monthsWithData = Array.from(new Set(allSections.map((s) => s.monthKey))).sort()
+    const sourceMonth = [...monthsWithData].reverse().find((m) => m < month) ?? monthsWithData.find((m) => m > month)
+    if (!sourceMonth) return
+    duplicateRequestedFor.current = month
+    const sourceSections = allSections.filter((s) => s.monthKey === sourceMonth)
+    duplicateBudgetMonth.mutate({ fromSections: sourceSections, fromItemsBySection: itemsBySection, toMonthKey: month })
+  }, [month, allSections, monthSections.length, itemsBySection, duplicateBudgetMonth, sections.isLoading, lineItems.isLoading])
+
+  if (monthlyIncomes.isLoading || sections.isLoading || lineItems.isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
@@ -44,66 +71,67 @@ export default function BudgetPlannerScreen() {
     )
   }
 
-  const income = profile.data?.monthlyIncome ?? 0
-  const savings = profile.data?.monthlySavings ?? 0
-  const items = lineItems.data ?? []
-  const expenses = items.reduce((sum, i) => sum + i.monthlyAmount, 0)
-  const difference = income - expenses
-  const balance = difference - savings
-  const sortedSections = [...(sections.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
+  const { income, expenses, savings, difference, balance } = budgetStatsForMonth(
+    month,
+    allSections,
+    itemsBySection,
+    monthlyIncomes.data ?? [],
+  )
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Budget Planner</Text>
         <Text style={styles.subtitle}>A planned monthly budget, like a spreadsheet.</Text>
+        <MonthPicker />
+
+        {duplicateBudgetMonth.isPending && (
+          <Text style={styles.statSub}>Copying last month's plan into this month…</Text>
+        )}
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Summary</Text>
           <View style={styles.summaryGrid}>
-            <SummaryStat
-              label="Income"
-              value={income}
-              editable
-              onSave={(v) => updateProfile.mutate({ monthlyIncome: v })}
-            />
+            <SummaryStat label="Income" value={income} />
             <SummaryStat label="Expenses" value={expenses} />
             <SummaryStat label="Difference" value={difference} warn={difference < 0} />
-            <SummaryStat
-              label="Savings"
-              value={savings}
-              editable
-              onSave={(v) => updateProfile.mutate({ monthlySavings: v })}
-            />
+            <SummaryStat label="Savings" value={savings} />
             <SummaryStat label="Balance" value={balance} warn={balance < 0} />
           </View>
         </View>
 
-        {sortedSections.map((section) => (
-          <SectionBlock
-            key={section.id}
-            section={section}
-            items={items.filter((i) => i.sectionId === section.id).sort((a, b) => a.sortOrder - b.sortOrder)}
-            onAddItem={() =>
-              saveItem.mutate({
-                sectionId: section.id,
-                name: 'New item',
-                monthlyAmount: 0,
-                sortOrder: items.filter((i) => i.sectionId === section.id).length,
-              })
-            }
-            onSaveItem={(item) => saveItem.mutate(item)}
-            onDeleteItem={(id) => confirmDelete('Delete this line item?', () => deleteItem.mutate(id))}
-            onRenameSection={(name) => saveSection.mutate({ id: section.id, name, sortOrder: section.sortOrder })}
-            onDeleteSection={() =>
-              confirmDelete(`Delete "${section.name}" and all its line items?`, () => deleteSection.mutate(section.id))
-            }
-          />
-        ))}
+        {monthSections.map((section) => {
+          const sectionItems = (itemsBySection.get(section.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder)
+          return (
+            <SectionBlock
+              key={section.id}
+              section={section}
+              items={sectionItems}
+              onAddItem={() =>
+                saveItem.mutate({
+                  sectionId: section.id,
+                  name: 'New item',
+                  monthlyAmount: 0,
+                  sortOrder: sectionItems.length,
+                })
+              }
+              isAddingItem={saveItem.isPending}
+              onSaveItem={(item) => saveItem.mutate(item)}
+              onDeleteItem={(id) => confirmDelete('Delete this line item?', () => deleteItem.mutate(id))}
+              onRenameSection={(name) =>
+                saveSection.mutate({ id: section.id, name, sortOrder: section.sortOrder, monthKey: section.monthKey })
+              }
+              onDeleteSection={() =>
+                confirmDelete(`Delete "${section.name}" and all its line items?`, () => deleteSection.mutate(section.id))
+              }
+            />
+          )
+        })}
 
         <Pressable
           style={styles.addSectionButton}
-          onPress={() => saveSection.mutate({ name: 'New section', sortOrder: sortedSections.length })}
+          onPress={() => saveSection.mutate({ name: 'New section', sortOrder: monthSections.length, monthKey: month })}
+          disabled={saveSection.isPending}
         >
           <Plus size={15} color={colors.textSoft} />
           <Text style={styles.addSectionText}>Add section</Text>
@@ -113,56 +141,11 @@ export default function BudgetPlannerScreen() {
   )
 }
 
-function SummaryStat({
-  label,
-  value,
-  warn,
-  editable,
-  onSave,
-}: {
-  label: string
-  value: number
-  warn?: boolean
-  editable?: boolean
-  onSave?: (v: number) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(String(value))
-
-  const commit = () => {
-    // Number('') is 0, not NaN — an emptied field must not silently save as $0.
-    const parsed = draft.trim() === '' ? NaN : Number(draft)
-    if (!Number.isNaN(parsed)) onSave?.(parsed)
-    setEditing(false)
-  }
-
+function SummaryStat({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
   return (
     <View style={styles.summaryStat}>
       <Text style={styles.summaryLabel}>{label}</Text>
-      {editable && editing ? (
-        <TextInput
-          autoFocus
-          style={[styles.summaryValue, styles.summaryInput]}
-          keyboardType="decimal-pad"
-          value={draft}
-          onChangeText={setDraft}
-          onBlur={commit}
-          onSubmitEditing={commit}
-        />
-      ) : (
-        <Pressable
-          onPress={
-            editable
-              ? () => {
-                  setDraft(String(value))
-                  setEditing(true)
-                }
-              : undefined
-          }
-        >
-          <Text style={[styles.summaryValue, warn && { color: colors.warn }]}>{formatMoney(value)}</Text>
-        </Pressable>
-      )}
+      <Text style={[styles.summaryValue, warn && { color: colors.warn }]}>{formatMoney(value)}</Text>
     </View>
   )
 }
@@ -171,6 +154,7 @@ function SectionBlock({
   section,
   items,
   onAddItem,
+  isAddingItem,
   onSaveItem,
   onDeleteItem,
   onRenameSection,
@@ -179,6 +163,7 @@ function SectionBlock({
   section: BudgetSection
   items: BudgetLineItem[]
   onAddItem: () => void
+  isAddingItem: boolean
   onSaveItem: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) => void
   onDeleteItem: (id: string) => void
   onRenameSection: (name: string) => void
@@ -210,7 +195,7 @@ function SectionBlock({
         <LineItemRow key={item.id} item={item} onSave={onSaveItem} onDelete={() => onDeleteItem(item.id)} />
       ))}
 
-      <Pressable style={styles.addItemButton} onPress={onAddItem}>
+      <Pressable style={styles.addItemButton} onPress={onAddItem} disabled={isAddingItem}>
         <Plus size={13} color={colors.primary} />
         <Text style={styles.addItemText}>Add line item</Text>
       </Pressable>
@@ -295,7 +280,6 @@ const styles = StyleSheet.create({
   summaryStat: { minWidth: 90 },
   summaryLabel: { fontSize: 10, color: colors.textSoft, letterSpacing: 0.5, textTransform: 'uppercase' },
   summaryValue: { fontSize: 17, fontWeight: '600', color: colors.ink, marginTop: 2 },
-  summaryInput: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 1, minWidth: 70 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sectionName: {
     flex: 1,

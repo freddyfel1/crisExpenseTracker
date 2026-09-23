@@ -5,12 +5,14 @@ import {
   deleteInvestmentAccount,
   deleteInvestmentTransaction,
   deleteTransaction,
+  duplicateBudgetMonth,
   fetchBudgetLineItems,
   fetchBudgetSections,
   fetchCategories,
   fetchInvestmentAccounts,
   fetchInvestmentPrices,
   fetchInvestmentTransactions,
+  fetchMonthlyIncome,
   fetchProfile,
   fetchTransactions,
   refreshInvestmentPrices,
@@ -19,6 +21,7 @@ import {
   upsertBudgetSection,
   upsertInvestmentAccount,
   upsertInvestmentTransaction,
+  upsertMonthlyIncome,
   upsertTransaction,
 } from '../data/api'
 import type {
@@ -86,6 +89,25 @@ export function useDeleteTransaction() {
   })
 }
 
+export function useMonthlyIncomes() {
+  const { session } = useSession()
+  return useQuery({
+    queryKey: ['monthlyIncomes', session?.user.id],
+    queryFn: fetchMonthlyIncome,
+    enabled: Boolean(session),
+  })
+}
+
+export function useSaveMonthlyIncome() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (entry: { monthKey: string; monthlyIncome?: number; otherIncome?: number }) =>
+      upsertMonthlyIncome(session!.user.id, entry),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['monthlyIncomes', session?.user.id] }),
+  })
+}
+
 export function useBudgetSections() {
   const { session } = useSession()
   return useQuery({
@@ -141,6 +163,26 @@ export function useDeleteBudgetLineItem() {
   return useMutation({
     mutationFn: (id: string) => deleteBudgetLineItem(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['budgetLineItems', session?.user.id] }),
+  })
+}
+
+export function useDuplicateBudgetMonth() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      fromSections,
+      fromItemsBySection,
+      toMonthKey,
+    }: {
+      fromSections: BudgetSection[]
+      fromItemsBySection: Map<string, BudgetLineItem[]>
+      toMonthKey: string
+    }) => duplicateBudgetMonth(session!.user.id, fromSections, fromItemsBySection, toMonthKey),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgetSections', session?.user.id] })
+      queryClient.invalidateQueries({ queryKey: ['budgetLineItems', session?.user.id] })
+    },
   })
 }
 
