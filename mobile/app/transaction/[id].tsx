@@ -19,7 +19,7 @@ import { getReceiptSignedUrl } from '../../src/data/api'
 import { useCategories, useDeleteTransaction, useSaveTransaction, useTransactions } from '../../src/hooks/useAppData'
 import type { Transaction } from '../../src/types'
 import { colors } from '../../src/theme'
-import { todayKey } from '../../src/utils/format'
+import { formatMoney, todayKey } from '../../src/utils/format'
 
 function emptyTransaction(): Transaction {
   return { id: uuidv4(), date: todayKey(), merchant: '', categoryId: null, amount: 0, paymentMethod: null, tags: [] }
@@ -99,14 +99,7 @@ export default function TransactionDetail() {
           />
         </Field>
 
-        <Field label="Amount">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={String(draft.amount)}
-            onChangeText={(v) => setDraft({ ...draft, amount: Number(v) || 0 })}
-          />
-        </Field>
+        <CurrencyField label="Amount" value={draft.amount} onCommit={(v) => setDraft({ ...draft, amount: v })} />
 
         <Field label="Date">
           <TextInput
@@ -169,6 +162,32 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Text style={styles.label}>{label}</Text>
       {children}
     </View>
+  )
+}
+
+// A plain-number TextInput bound directly to `value={String(n)}` snaps back to the
+// formatted number after every keystroke, silently eating a just-typed decimal point (typing
+// "12.5" becomes "125" since the "." never survives a re-render). Keeping the input's own
+// text as local state — synced back to the parent only on blur — lets the user type freely,
+// and shows a formatted dollar amount while not focused, matching the web app's Amount field.
+function CurrencyField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+  const [text, setText] = useState(formatMoney(value))
+  return (
+    <Field label={label}>
+      <TextInput
+        style={styles.input}
+        keyboardType="decimal-pad"
+        value={text}
+        onChangeText={setText}
+        onFocus={() => setText(value === 0 ? '' : String(value))}
+        onBlur={() => {
+          const parsed = Number(text.replace(/[^0-9.-]/g, ''))
+          const next = Number.isNaN(parsed) ? value : parsed
+          onCommit(next)
+          setText(formatMoney(next))
+        }}
+      />
+    </Field>
   )
 }
 
