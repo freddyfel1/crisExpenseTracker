@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { DollarSign, FileText, Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
-import { holdingsForAccount, marketValue, totalInvested } from '../data/selectors'
+import { holdingsForAccount, marketValue, mergeHoldingsBySymbol, totalInvested } from '../data/selectors'
 import { syncPlaidInvestments } from '../data/api'
 import { useSession } from '../hooks/useSession'
 import { firstName, formatDate, formatMoney, formatRelativeTime } from '../utils/format'
@@ -134,7 +134,7 @@ export function InvestmentsAssetPage({
 
   const invested = totalInvested(pageTransactions, pageAccounts.map((a) => a.id))
   const allHoldings = useMemo(
-    () => pageAccounts.flatMap((a) => holdingsForAccount(pageTransactions, a.id)),
+    () => mergeHoldingsBySymbol(pageAccounts.flatMap((a) => holdingsForAccount(pageTransactions, a.id))),
     [pageAccounts, pageTransactions],
   )
   const holdingCount = allHoldings.length
