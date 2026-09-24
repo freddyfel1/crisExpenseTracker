@@ -141,6 +141,27 @@ export const holdingsForAccount = (transactions: InvestmentTransaction[], accoun
     .sort((a, b) => b.costBasis - a.costBasis)
 }
 
+// Combines the same symbol held across multiple accounts into one row (summing quantity,
+// cost basis, and dividends, and recomputing avgCost from the combined totals) — without
+// this, a portfolio-wide view built from `accounts.flatMap(a => holdingsForAccount(...))`
+// shows the same symbol as separate rows per account: a duplicate React key wherever it's
+// used as a list key, an inflated holdings count, and confusingly duplicate chart bars.
+export const mergeHoldingsBySymbol = (holdings: Holding[]): Holding[] => {
+  const bySymbol = new Map<string, Holding>()
+  for (const h of holdings) {
+    const existing = bySymbol.get(h.symbol)
+    if (!existing) {
+      bySymbol.set(h.symbol, { ...h })
+      continue
+    }
+    existing.quantity += h.quantity
+    existing.costBasis += h.costBasis
+    existing.dividends += h.dividends
+    existing.avgCost = existing.quantity > 0 ? existing.costBasis / existing.quantity : 0
+  }
+  return [...bySymbol.values()].sort((a, b) => b.costBasis - a.costBasis)
+}
+
 export const totalInvested = (transactions: InvestmentTransaction[], accountIds: string[]): number =>
   accountIds.reduce(
     (sum, id) => sum + holdingsForAccount(transactions, id).reduce((s, h) => s + h.costBasis, 0),

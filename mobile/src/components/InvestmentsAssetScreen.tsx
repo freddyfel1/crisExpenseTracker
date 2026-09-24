@@ -14,7 +14,7 @@ import {
   useSaveInvestmentAccount,
   useSaveInvestmentTransaction,
 } from '../hooks/useAppData'
-import { holdingsForAccount, marketValue, totalInvested } from '../data/selectors'
+import { holdingsForAccount, marketValue, mergeHoldingsBySymbol, totalInvested } from '../data/selectors'
 import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction } from '../types'
 import { formatMoney } from '../utils/format'
 import { colors } from '../theme'
@@ -121,7 +121,7 @@ export function InvestmentsAssetScreen({
   }
 
   const invested = totalInvested(pageTransactions, pageAccounts.map((a) => a.id))
-  const allHoldings = pageAccounts.flatMap((a) => holdingsForAccount(pageTransactions, a.id))
+  const allHoldings = mergeHoldingsBySymbol(pageAccounts.flatMap((a) => holdingsForAccount(pageTransactions, a.id)))
   const holdingCount = allHoldings.length
   const portfolioValue = marketValue(allHoldings, priceMap)
   const unrealizedGain = portfolioValue - invested
