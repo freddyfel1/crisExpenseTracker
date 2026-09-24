@@ -33,14 +33,24 @@ export function TransactionDrawer({ id, onClose }: Props) {
   // every refetch (see toTransaction in api.ts), so depending on it directly would
   // silently overwrite an in-progress edit whenever this transaction changed elsewhere
   // (or just re-synced) while the drawer was open.
+  //
+  // Guard against marking `id` as seeded before `existing` has actually loaded: if the
+  // transactions query hasn't resolved yet at the moment `id` changes, `existing` is
+  // briefly undefined, and naively marking the ref here would permanently freeze the
+  // draft on stale/empty data once the real row does load, since the ref match would
+  // then suppress the reseed that should happen.
   const seededIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (seededIdRef.current !== id) {
-      setDraft(existing ?? emptyTransaction())
+    if (seededIdRef.current === id) return
+    if (isNew) {
+      setDraft(emptyTransaction())
+      seededIdRef.current = id
+    } else if (existing) {
+      setDraft(existing)
       seededIdRef.current = id
     }
-  }, [id, existing])
+  }, [id, existing, isNew])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
