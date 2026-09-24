@@ -123,6 +123,46 @@ export const incomeForMonth = (entries: MonthlyIncome[], month: string): number 
   return monthlyIncome + otherIncome
 }
 
+export interface SectionBudget {
+  sectionId: string
+  name: string
+  total: number
+}
+
+// Mirrors budgetStatsForMonth's `expenses` figure (savings section excluded) broken down
+// per section, so its total lines up with the "Budgeted" side of the Dashboard's
+// budget-vs-actual comparison instead of double-counting money already earmarked as savings.
+export const budgetBySection = (
+  budgetSections: BudgetSection[],
+  itemsBySection: Map<string, BudgetLineItem[]>,
+  month: string,
+): SectionBudget[] => {
+  const sections = budgetSections.filter((s) => s.monthKey === month)
+  const savingsSection = sections.find((s) => s.name.toLowerCase().includes('saving'))
+  return sections
+    .filter((s) => s.id !== savingsSection?.id)
+    .map((s) => ({
+      sectionId: s.id,
+      name: s.name,
+      total: (itemsBySection.get(s.id) ?? []).reduce((sum, i) => sum + i.monthlyAmount, 0),
+    }))
+    .filter((s) => s.total > 0)
+    .sort((a, b) => b.total - a.total)
+}
+
+export const spendTrend = (transactions: Transaction[], monthsBack: number) => {
+  const now = new Date()
+  const months: { key: string; label: string; total: number }[] = []
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString('en-US', { month: 'short' })
+    const total = totalSpend(transactionsForMonth(transactions, key))
+    months.push({ key, label, total: Math.round(total * 100) / 100 })
+  }
+  return months
+}
+
 export const groupBudgetItemsBySection = (items: BudgetLineItem[]): Map<string, BudgetLineItem[]> => {
   const map = new Map<string, BudgetLineItem[]>()
   for (const item of items) {

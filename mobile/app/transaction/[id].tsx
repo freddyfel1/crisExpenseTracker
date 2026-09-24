@@ -14,13 +14,20 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Trash2 } from 'lucide-react-native'
+import { v4 as uuidv4 } from 'uuid'
 import { getReceiptSignedUrl } from '../../src/data/api'
 import { useCategories, useDeleteTransaction, useSaveTransaction, useTransactions } from '../../src/hooks/useAppData'
 import type { Transaction } from '../../src/types'
 import { colors } from '../../src/theme'
+import { todayKey } from '../../src/utils/format'
+
+function emptyTransaction(): Transaction {
+  return { id: uuidv4(), date: todayKey(), merchant: '', categoryId: null, amount: 0, paymentMethod: null, tags: [] }
+}
 
 export default function TransactionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
+  const isNew = id === 'new'
   const router = useRouter()
   const transactions = useTransactions()
   const categories = useCategories()
@@ -28,12 +35,12 @@ export default function TransactionDetail() {
   const deleteTransaction = useDeleteTransaction()
 
   const existing = transactions.data?.find((t) => t.id === id)
-  const [draft, setDraft] = useState<Transaction | null>(existing ?? null)
+  const [draft, setDraft] = useState<Transaction | null>(isNew ? emptyTransaction() : existing ?? null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   // Seeds the draft once, the first time `existing` loads — resyncing on every later
   // refetch would silently overwrite whatever the user is mid-typing whenever this same
   // transaction changes server-side (edited on web, or via another sync) while open here.
-  const hasSeededDraft = useRef(false)
+  const hasSeededDraft = useRef(isNew)
 
   useEffect(() => {
     if (existing && !hasSeededDraft.current) {
@@ -138,16 +145,18 @@ export default function TransactionDetail() {
         </Field>
 
         <View style={styles.actions}>
-          <Pressable style={styles.saveButton} onPress={save} disabled={saveTransaction.isPending}>
+          <Pressable style={styles.saveButton} onPress={save} disabled={saveTransaction.isPending || !draft.merchant.trim()}>
             {saveTransaction.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.saveButtonText}>Save changes</Text>
+              <Text style={styles.saveButtonText}>{isNew ? 'Add transaction' : 'Save changes'}</Text>
             )}
           </Pressable>
-          <Pressable style={styles.deleteButton} onPress={remove}>
-            <Trash2 size={18} color={colors.warn} />
-          </Pressable>
+          {!isNew && (
+            <Pressable style={styles.deleteButton} onPress={remove}>
+              <Trash2 size={18} color={colors.warn} />
+            </Pressable>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
