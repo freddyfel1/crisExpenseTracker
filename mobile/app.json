@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "crisExpenseTracker",
+    "name": "Budget Planner Plus",
     "slug": "cris-expense-tracker",
     "scheme": "crisexpensetracker",
     "version": "1.0.0",
@@ -30,13 +30,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "crisExpenseTracker uses your camera to photograph receipts so it can extract and categorize the expense."
+          "cameraPermission": "Budget Planner Plus uses your camera to photograph receipts so it can extract and categorize the expense."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "crisExpenseTracker needs access to your photos to attach a receipt image to a transaction."
+          "photosPermission": "Budget Planner Plus needs access to your photos to attach a receipt image to a transaction."
         }
       ]
     ]
