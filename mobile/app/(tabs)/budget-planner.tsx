@@ -215,7 +215,7 @@ function LineItemRow({
   // See SectionBlock's `name` state — onBlur's nativeEvent has no `.text`, so each
   // field's current value is tracked via onChangeText and read from state on blur.
   const [name, setName] = useState(item.name)
-  const [amount, setAmount] = useState(String(item.monthlyAmount))
+  const [amount, setAmount] = useState(formatMoney(item.monthlyAmount))
   const [miscInfo, setMiscInfo] = useState(item.miscInfo ?? '')
   const [remarks, setRemarks] = useState(item.remarks ?? '')
 
@@ -234,7 +234,13 @@ function LineItemRow({
           placeholder="Monthly"
           keyboardType="decimal-pad"
           onChangeText={setAmount}
-          onBlur={() => onSave({ ...item, monthlyAmount: Number(amount) || 0 })}
+          onFocus={() => setAmount(item.monthlyAmount === 0 ? '' : String(item.monthlyAmount))}
+          onBlur={() => {
+            const parsed = Number(amount.replace(/[^0-9.-]/g, ''))
+            const next = Number.isNaN(parsed) ? item.monthlyAmount : parsed
+            onSave({ ...item, monthlyAmount: next })
+            setAmount(formatMoney(next))
+          }}
           style={[styles.itemInput, { flex: 0.8 }]}
         />
         <Pressable onPress={onDelete} hitSlop={8}>
