@@ -9,6 +9,7 @@ import {
 } from '../../src/hooks/useAppData'
 import type { AssetType, InvestmentTransaction, InvestmentTransactionType } from '../../src/types'
 import { colors } from '../../src/theme'
+import { formatMoney } from '../../src/utils/format'
 
 const ASSET_TYPES: { value: AssetType; label: string }[] = [
   { value: 'etf', label: 'ETF' },
@@ -124,32 +125,19 @@ export default function InvestmentTransactionDetail() {
           </View>
         </Field>
 
-        <Field label="Quantity">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={String(draft.quantity)}
-            onChangeText={(v) => setDraft({ ...draft, quantity: Number(v) || 0 })}
-          />
-        </Field>
+        <NumberField
+          label="Quantity"
+          value={draft.quantity}
+          onCommit={(v) => setDraft({ ...draft, quantity: v })}
+        />
 
-        <Field label="Price per unit">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={String(draft.pricePerUnit)}
-            onChangeText={(v) => setDraft({ ...draft, pricePerUnit: Number(v) || 0 })}
-          />
-        </Field>
+        <CurrencyField
+          label="Price per unit"
+          value={draft.pricePerUnit}
+          onCommit={(v) => setDraft({ ...draft, pricePerUnit: v })}
+        />
 
-        <Field label="Fees">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={String(draft.fees)}
-            onChangeText={(v) => setDraft({ ...draft, fees: Number(v) || 0 })}
-          />
-        </Field>
+        <CurrencyField label="Fees" value={draft.fees} onCommit={(v) => setDraft({ ...draft, fees: v })} />
 
         <Field label="Date">
           <TextInput
@@ -192,6 +180,54 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Text style={styles.label}>{label}</Text>
       {children}
     </View>
+  )
+}
+
+// A plain-number TextInput bound directly to `value={String(n)}` snaps back to the
+// formatted number after every keystroke, silently eating a just-typed decimal point (typing
+// "12.5" becomes "125" since the "." never survives a re-render). Keeping the input's own
+// text as local state — synced back to the parent only on blur — lets the user type freely.
+function NumberField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+  const [text, setText] = useState(String(value))
+  return (
+    <Field label={label}>
+      <TextInput
+        style={styles.input}
+        keyboardType="decimal-pad"
+        value={text}
+        onChangeText={setText}
+        onFocus={() => setText(value === 0 ? '' : String(value))}
+        onBlur={() => {
+          const parsed = Number(text)
+          const next = Number.isNaN(parsed) ? value : parsed
+          onCommit(next)
+          setText(String(next))
+        }}
+      />
+    </Field>
+  )
+}
+
+// Same fix as NumberField, plus shows a formatted dollar amount while not focused (matching
+// the web app's Amount field) instead of a bare number.
+function CurrencyField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+  const [text, setText] = useState(formatMoney(value))
+  return (
+    <Field label={label}>
+      <TextInput
+        style={styles.input}
+        keyboardType="decimal-pad"
+        value={text}
+        onChangeText={setText}
+        onFocus={() => setText(value === 0 ? '' : String(value))}
+        onBlur={() => {
+          const parsed = Number(text.replace(/[^0-9.-]/g, ''))
+          const next = Number.isNaN(parsed) ? value : parsed
+          onCommit(next)
+          setText(formatMoney(next))
+        }}
+      />
+    </Field>
   )
 }
 

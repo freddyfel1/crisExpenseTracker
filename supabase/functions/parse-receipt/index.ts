@@ -54,7 +54,13 @@ Deno.serve(async (req: Request) => {
 
   const arrayBuffer = await imageBlob.arrayBuffer()
   const base64Image = encodeBase64(new Uint8Array(arrayBuffer))
-  const mediaType = imageBlob.type || 'image/jpeg'
+  // The client always uploads receipts as JPEG (explicit `contentType: 'image/jpeg'` on
+  // upload), but the downloaded blob's own reported `.type` isn't reliably one of the four
+  // types Claude's API accepts — seen in practice returning something else on iOS uploads,
+  // which fails Claude's request validation before it ever looks at the image bytes. Trust
+  // the known upload format over whatever the blob claims instead of passing it through.
+  const ACCEPTED_MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+  const mediaType = ACCEPTED_MEDIA_TYPES.has(imageBlob.type) ? imageBlob.type : 'image/jpeg'
 
   const categoryList = (categories ?? []).map((c) => `- ${c.id}: ${c.name}`).join('\n')
   const prompt = `You are extracting structured data from a photo of a receipt for an expense tracking app.
