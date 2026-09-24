@@ -4,6 +4,11 @@ export const formatMoney = (amount: number): string =>
 export const formatMoneyCompact = (amount: number): string =>
   Math.abs(amount) >= 1000 ? `$${(amount / 1000).toFixed(1)}k` : formatMoney(amount)
 
+export const todayKey = (): string => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 // Parses the YYYY-MM-DD part as a local calendar date, not UTC — `new Date(iso)`
 // on a date-only string parses as UTC midnight, which rolls back a day when
 // displayed in any timezone behind UTC.
