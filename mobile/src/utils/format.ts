@@ -1,6 +1,9 @@
 export const formatMoney = (amount: number): string =>
   amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
+export const formatMoneyCompact = (amount: number): string =>
+  Math.abs(amount) >= 1000 ? `$${(amount / 1000).toFixed(1)}k` : formatMoney(amount)
+
 // Parses the YYYY-MM-DD part as a local calendar date, not UTC — `new Date(iso)`
 // on a date-only string parses as UTC midnight, which rolls back a day when
 // displayed in any timezone behind UTC.

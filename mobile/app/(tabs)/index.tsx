@@ -1,17 +1,42 @@
 import { ActivityIndicator, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCategories, useMonthlyIncomes, useSaveMonthlyIncome, useTransactions } from '../../src/hooks/useAppData'
-import { monthlyIncomeEntryForMonth, spendByCategory, totalSpend, transactionsForMonth } from '../../src/data/selectors'
+import {
+  useBudgetLineItems,
+  useBudgetSections,
+  useCategories,
+  useMonthlyIncomes,
+  useProfile,
+  useSaveMonthlyIncome,
+  useTransactions,
+} from '../../src/hooks/useAppData'
+import {
+  budgetBySection,
+  budgetStatsForMonth,
+  groupBudgetItemsBySection,
+  incomeForMonth,
+  monthlyIncomeEntryForMonth,
+  spendByCategory,
+  spendTrend,
+  totalSpend,
+  transactionsForMonth,
+} from '../../src/data/selectors'
 import { usePeriod } from '../../src/data/period'
 import { formatMoney, monthKeyLabel } from '../../src/utils/format'
 import { colors } from '../../src/theme'
 import { MonthPicker } from '../../src/components/MonthPicker'
+import { CategoryBreakdownCard } from '../../src/components/CategoryBreakdownCard'
+import { BudgetBreakdownCard } from '../../src/components/BudgetBreakdownCard'
+import { SpendTrendChart } from '../../src/components/SpendTrendChart'
+import { IncomeExpenseTrendChart } from '../../src/components/IncomeExpenseTrendChart'
 
 export default function Home() {
   const transactions = useTransactions()
   const categories = useCategories()
   const monthlyIncomes = useMonthlyIncomes()
+  const budgetSections = useBudgetSections()
+  const budgetLineItems = useBudgetLineItems()
+  const profile = useProfile()
   const saveMonthlyIncome = useSaveMonthlyIncome()
   const queryClient = useQueryClient()
   const { month } = usePeriod()
@@ -31,13 +56,26 @@ export default function Home() {
     )
   }
 
-  const monthTxns = transactionsForMonth(transactions.data ?? [], month)
+  const allTransactions = transactions.data ?? []
+  const monthTxns = transactionsForMonth(allTransactions, month)
   const spend = spendByCategory(monthTxns)
   const spent = totalSpend(monthTxns)
   const { monthlyIncome, otherIncome } = monthlyIncomeEntryForMonth(monthlyIncomes.data ?? [], month)
   const income = monthlyIncome + otherIncome
   const difference = income - spent
-  const categoryById = new Map((categories.data ?? []).map((c) => [c.id, c]))
+  const trend = spendTrend(allTransactions, 6)
+  const incomeExpenseTrend = trend.map((m) => ({
+    label: m.label,
+    income: incomeForMonth(monthlyIncomes.data ?? [], m.key),
+    expense: m.total,
+  }))
+
+  const itemsBySection = groupBudgetItemsBySection(budgetLineItems.data ?? [])
+  const budgetData = budgetBySection(budgetSections.data ?? [], itemsBySection, month)
+  const { expenses: budgeted } = budgetStatsForMonth(month, budgetSections.data ?? [], itemsBySection, monthlyIncomes.data ?? [])
+  const budgetGap = spent - budgeted
+
+  const firstName = profile.data?.name?.trim().split(/\s+/)[0]
 
   return (
     <SafeAreaView style={styles.container}>
@@ -45,59 +83,108 @@ export default function Home() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text style={styles.title}>Dashboard</Text>
+        <Text style={styles.title}>
+          Dashboard
+          {firstName ? <Text style={styles.titleWelcome}> — Welcome, {firstName}</Text> : null}
+        </Text>
         <Text style={styles.subtitle}>Your financial position for {monthKeyLabel(month)}</Text>
         <MonthPicker />
 
-        <View style={styles.statRow}>
+        <View style={styles.statGrid}>
           <EditableStat
             label="INCOME"
             value={monthlyIncome}
+            sub="tap to edit"
             onSave={(v) => saveMonthlyIncome.mutate({ monthKey: month, monthlyIncome: v })}
           />
           <EditableStat
             label="OTHER INCOME"
             value={otherIncome}
+            sub="tap to edit"
             onSave={(v) => saveMonthlyIncome.mutate({ monthKey: month, otherIncome: v })}
           />
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>TOTAL EXPENSE</Text>
-            <Text style={styles.statValue}>{formatMoney(spent)}</Text>
-            <Text style={styles.statSub}>{monthTxns.length} transactions</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>DIFFERENCE</Text>
-            <Text style={[styles.statValue, { color: difference < 0 ? colors.warn : colors.primary }]}>
-              {formatMoney(difference)}
+          <Stat label="TOTAL INCOME" value={formatMoney(income)} sub="income + other income" />
+          <Stat label="TOTAL EXPENSE" value={formatMoney(spent)} sub={`${monthTxns.length} transactions`} />
+          <Stat
+            label="DIFFERENCE"
+            value={formatMoney(difference)}
+            sub="income minus expense"
+            color={difference < 0 ? colors.warn : colors.primary}
+          />
+          <Stat
+            label="6-MONTH TREND"
+            value={formatMoney(trend[trend.length - 1]?.total ?? 0)}
+            sub="this month vs. prior months"
+          />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Category breakdown vs. budget planner</Text>
+          <Text style={styles.sectionLabel}>Actual spending</Text>
+          <CategoryBreakdownCard data={spend} categories={categories.data ?? []} />
+          <View style={styles.divider} />
+          <Text style={styles.sectionLabel}>Budget planner</Text>
+          <BudgetBreakdownCard data={budgetData} />
+          <View style={styles.budgetSummary}>
+            <View style={styles.budgetSummaryRow}>
+              <Text style={styles.budgetSummaryText}>
+                Budgeted <Text style={styles.budgetSummaryMono}>{formatMoney(budgeted)}</Text>
+              </Text>
+              <Text style={styles.budgetSummaryText}>
+                Actual <Text style={styles.budgetSummaryMono}>{formatMoney(spent)}</Text>
+              </Text>
+            </View>
+            <Text style={[styles.budgetSummaryVerdict, { color: budgetGap > 0 ? colors.warn : colors.primary }]}>
+              {budgetGap > 0
+                ? `${formatMoney(budgetGap)} over budget`
+                : budgetGap < 0
+                  ? `${formatMoney(Math.abs(budgetGap))} under budget`
+                  : 'Right on budget'}
             </Text>
-            <Text style={styles.statSub}>income minus expense</Text>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Category breakdown</Text>
-          {spend.length === 0 && <Text style={styles.statSub}>No spending recorded this month.</Text>}
-          {spend.slice(0, 8).map((s) => {
-            const category = s.categoryId ? categoryById.get(s.categoryId) : undefined
-            const pct = spent > 0 ? Math.round((s.total / spent) * 100) : 0
-            return (
-              <View key={s.categoryId ?? 'uncategorized'} style={styles.row}>
-                <View style={[styles.dot, { backgroundColor: category?.color ?? colors.textSoft }]} />
-                <Text style={styles.rowLabel} numberOfLines={1}>
-                  {category?.name ?? 'Uncategorized'}
-                </Text>
-                <Text style={styles.rowPct}>{pct}%</Text>
-                <Text style={styles.rowAmount}>{formatMoney(s.total)}</Text>
-              </View>
-            )
-          })}
+          <Text style={styles.cardTitle}>Spending trend</Text>
+          <SpendTrendChart data={trend} />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Income vs. expense (6 months)</Text>
+          <IncomeExpenseTrendChart data={incomeExpenseTrend} />
         </View>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-function EditableStat({ label, value, onSave }: { label: string; value: number; onSave: (v: number) => void }) {
+function Stat({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statValue, color ? { color } : null]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      {sub && (
+        <Text style={styles.statSub} numberOfLines={1}>
+          {sub}
+        </Text>
+      )}
+    </View>
+  )
+}
+
+function EditableStat({
+  label,
+  value,
+  sub,
+  onSave,
+}: {
+  label: string
+  value: number
+  sub?: string
+  onSave: (v: number) => void
+}) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(String(value))
 
@@ -128,10 +215,14 @@ function EditableStat({ label, value, onSave }: { label: string; value: number; 
             setEditing(true)
           }}
         >
-          <Text style={styles.statValue}>{formatMoney(value)}</Text>
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+            {formatMoney(value)}
+          </Text>
         </Pressable>
       )}
-      <Text style={styles.statSub}>{editing ? 'editing…' : 'tap to edit'}</Text>
+      <Text style={styles.statSub} numberOfLines={1}>
+        {editing ? 'editing…' : sub}
+      </Text>
     </View>
   )
 }
@@ -140,11 +231,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
+  titleWelcome: { fontSize: 18, fontWeight: '600', color: colors.primary },
   subtitle: { fontSize: 13, color: colors.textSoft, marginTop: -8 },
-  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCard: {
-    flex: 1,
-    minWidth: 100,
+    flexBasis: '47%',
+    flexGrow: 1,
     backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
@@ -164,9 +256,19 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cardTitle: { fontSize: 14, fontWeight: '600', color: colors.ink, marginBottom: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  rowLabel: { flex: 1, fontSize: 13, color: colors.text },
-  rowPct: { fontSize: 12, color: colors.textSoft },
-  rowAmount: { fontSize: 13, fontWeight: '600', color: colors.ink, width: 72, textAlign: 'right' },
+  sectionLabel: { fontSize: 11, fontWeight: '600', color: colors.textSoft, textTransform: 'uppercase', letterSpacing: 0.5 },
+  divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 4 },
+  budgetSummary: {
+    marginTop: 4,
+    backgroundColor: colors.paper,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    padding: 12,
+    gap: 6,
+  },
+  budgetSummaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  budgetSummaryText: { fontSize: 13, color: colors.textSoft },
+  budgetSummaryMono: { color: colors.ink, fontWeight: '600' },
+  budgetSummaryVerdict: { fontSize: 13, fontWeight: '600' },
 })
