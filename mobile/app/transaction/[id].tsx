@@ -99,7 +99,7 @@ export default function TransactionDetail() {
           />
         </Field>
 
-        <CurrencyField label="Amount" value={draft.amount} onCommit={(v) => setDraft({ ...draft, amount: v })} />
+        <CurrencyField label="Price" value={draft.amount} onCommit={(v) => setDraft({ ...draft, amount: v })} />
 
         <Field label="Date">
           <TextInput
