@@ -191,13 +191,14 @@ export function Investments() {
           y = margin
         }
         const accountCostBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
+        const accountMarketValue = marketValue(holdings, investmentPrices)
 
         doc.setFontSize(12)
         doc.setTextColor(20)
         doc.setFont('helvetica', 'bold')
         doc.text(account.name, margin, y)
         doc.setFont('helvetica', 'normal')
-        doc.text(formatMoney(accountCostBasis), pageWidth - margin, y, { align: 'right' })
+        doc.text(formatMoney(accountMarketValue), pageWidth - margin, y, { align: 'right' })
         doc.setFontSize(9)
         doc.setTextColor(110)
         doc.text(
@@ -205,6 +206,7 @@ export function Investments() {
           margin,
           y + 12,
         )
+        doc.text(`${formatMoney(accountCostBasis)} cost basis`, pageWidth - margin, y + 12, { align: 'right' })
         y += 24
 
         if (holdings.length > 0) {
@@ -604,6 +606,7 @@ function AccountCard({
 }) {
   const holdings = holdingsForAccount(transactions, account.id)
   const accountCostBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
+  const accountMarketValue = marketValue(holdings, prices)
   const sortedTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
@@ -619,7 +622,10 @@ function AccountCard({
           {account.institution && <p className="text-[12px] text-[var(--text-soft)]">{account.institution}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <p className="font-mono text-[15px] font-medium text-[var(--ink)]">{formatMoney(accountCostBasis)}</p>
+          <div className="text-right">
+            <p className="font-mono text-[15px] font-medium text-[var(--ink)]">{formatMoney(accountMarketValue)}</p>
+            <p className="font-mono text-[11px] text-[var(--text-soft)]">{formatMoney(accountCostBasis)} cost basis</p>
+          </div>
           <button
             onClick={onEditAccount}
             className="grid h-8 w-8 place-items-center rounded-md text-[var(--text-soft)] hover:bg-[var(--paper)]"
