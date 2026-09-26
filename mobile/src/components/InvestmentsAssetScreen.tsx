@@ -319,6 +319,7 @@ function AccountCard({
 }) {
   const holdings = holdingsForAccount(transactions, account.id)
   const costBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
+  const accountMarketValue = marketValue(holdings, prices)
   const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
 
   return (
@@ -331,7 +332,10 @@ function AccountCard({
             {account.institution ? ` · ${account.institution}` : ''}
           </Text>
         </View>
-        <Text style={styles.accountTotal}>{formatMoney(costBasis)}</Text>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={styles.accountTotal}>{formatMoney(accountMarketValue)}</Text>
+          <Text style={styles.accountCostBasis}>{formatMoney(costBasis)} cost basis</Text>
+        </View>
         <Pressable onPress={onDeleteAccount} hitSlop={8}>
           <Trash2 size={15} color={colors.textSoft} />
         </Pressable>
@@ -422,6 +426,7 @@ function buildInvestmentsHtml({
     .map((account) => {
       const holdings = holdingsForAccount(transactionsByAccount, account.id)
       const costBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
+      const accountMarketValue = marketValue(holdings, prices)
       const rowsHtml = holdings
         .map((h) => {
           const priceNow = prices[h.symbol]
@@ -451,9 +456,10 @@ function buildInvestmentsHtml({
       return `<div class="account">
         <div class="account-header">
           <span>${escapeHtml(account.name)}</span>
-          <span>${formatMoney(costBasis)}</span>
+          <span>${formatMoney(accountMarketValue)}</span>
         </div>
         <div class="account-meta">${escapeHtml(ACCOUNT_TYPE_LABELS[account.accountType])}${account.institution ? ` · ${escapeHtml(account.institution)}` : ''}</div>
+        <div class="account-meta">${formatMoney(costBasis)} cost basis</div>
         ${tableHtml}
       </div>`
     })
@@ -541,6 +547,7 @@ const styles = StyleSheet.create({
   accountName: { fontSize: 15, fontWeight: '600', color: colors.ink },
   accountMeta: { fontSize: 12, color: colors.textSoft, marginTop: 2 },
   accountTotal: { fontSize: 14, fontWeight: '600', color: colors.ink, fontVariant: ['tabular-nums'] },
+  accountCostBasis: { fontSize: 11, color: colors.textSoft, fontVariant: ['tabular-nums'], marginTop: 1 },
   holdings: { gap: 8, borderTopWidth: 1, borderTopColor: colors.borderSoft, paddingTop: 8 },
   holdingBlock: { gap: 2 },
   holdingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
