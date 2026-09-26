@@ -22,7 +22,7 @@ import { HoldingsGainLoss } from './HoldingsGainLoss'
 
 const ACCOUNT_TYPE_LABELS: Record<InvestmentAccountType, string> = {
   brokerage: 'Brokerage',
-  crypto: 'Crypto exchange',
+  crypto: 'Crypto',
   retirement: 'Retirement',
   other: 'Other',
 }

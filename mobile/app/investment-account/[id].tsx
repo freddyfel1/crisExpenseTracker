@@ -12,7 +12,7 @@ import { colors } from '../../src/theme'
 
 const ACCOUNT_TYPES: { value: InvestmentAccountType; label: string }[] = [
   { value: 'brokerage', label: 'Brokerage' },
-  { value: 'crypto', label: 'Crypto exchange' },
+  { value: 'crypto', label: 'Crypto' },
   { value: 'retirement', label: 'Retirement' },
   { value: 'other', label: 'Other' },
 ]
