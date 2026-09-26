@@ -187,6 +187,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // formatted number after every keystroke, silently eating a just-typed decimal point (typing
 // "12.5" becomes "125" since the "." never survives a re-render). Keeping the input's own
 // text as local state — synced back to the parent only on blur — lets the user type freely.
+// Tapping in always clears the field (not just when it's already 0), so on a fresh "Add
+// transaction" — or editing any of these — there's never a leading "0" to delete by hand
+// first. Tapping out without typing anything leaves the value unchanged rather than saving
+// an emptied field as 0 (Number('') is 0, not NaN — that footgun bit a few web number
+// fields earlier; same guard here).
 function NumberField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
   const [text, setText] = useState(String(value))
   return (
@@ -196,12 +201,12 @@ function NumberField({ label, value, onCommit }: { label: string; value: number;
         keyboardType="decimal-pad"
         value={text}
         onChangeText={setText}
-        onFocus={() => setText(value === 0 ? '' : String(value))}
+        onFocus={() => setText('')}
         onBlur={() => {
-          const parsed = Number(text)
-          const next = Number.isNaN(parsed) ? value : parsed
-          onCommit(next)
-          setText(String(next))
+          const next = text.trim() === '' ? value : Number(text)
+          const safe = Number.isNaN(next) ? value : next
+          onCommit(safe)
+          setText(String(safe))
         }}
       />
     </Field>
@@ -219,12 +224,12 @@ function CurrencyField({ label, value, onCommit }: { label: string; value: numbe
         keyboardType="decimal-pad"
         value={text}
         onChangeText={setText}
-        onFocus={() => setText(value === 0 ? '' : String(value))}
+        onFocus={() => setText('')}
         onBlur={() => {
-          const parsed = Number(text.replace(/[^0-9.-]/g, ''))
-          const next = Number.isNaN(parsed) ? value : parsed
-          onCommit(next)
-          setText(formatMoney(next))
+          const next = text.trim() === '' ? value : Number(text.replace(/[^0-9.-]/g, ''))
+          const safe = Number.isNaN(next) ? value : next
+          onCommit(safe)
+          setText(formatMoney(safe))
         }}
       />
     </Field>
