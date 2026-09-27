@@ -3,6 +3,8 @@ import {
   deleteBudgetLineItem as apiDeleteBudgetLineItem,
   deleteBudgetSection as apiDeleteBudgetSection,
   deleteCategory as apiDeleteCategory,
+  deleteDebt as apiDeleteDebt,
+  deleteDebtPayment as apiDeleteDebtPayment,
   deleteInvestmentAccount as apiDeleteInvestmentAccount,
   deleteInvestmentTransaction as apiDeleteInvestmentTransaction,
   deleteSavingsGoal as apiDeleteSavingsGoal,
@@ -11,6 +13,8 @@ import {
   fetchBudgetLineItems,
   fetchBudgetSections,
   fetchCategories,
+  fetchDebtPayments,
+  fetchDebts,
   fetchInvestmentAccounts,
   fetchInvestmentPrices,
   fetchInvestmentsLastSynced,
@@ -25,6 +29,8 @@ import {
   upsertBudgetLineItem,
   upsertBudgetSection,
   upsertCategory,
+  upsertDebt,
+  upsertDebtPayment,
   upsertInvestmentAccount,
   upsertInvestmentTransaction,
   upsertMonthlyIncome,
@@ -37,6 +43,8 @@ import type {
   BudgetLineItem,
   BudgetSection,
   Category,
+  Debt,
+  DebtPayment,
   InvestmentAccount,
   InvestmentTransaction,
   MonthlyIncome,
@@ -109,6 +117,16 @@ export function useStore() {
   const investmentsLastSyncedQuery = useQuery({
     queryKey: ['investmentsLastSynced', userId],
     queryFn: fetchInvestmentsLastSynced,
+    enabled: Boolean(userId),
+  })
+  const debtsQuery = useQuery({
+    queryKey: ['debts', userId],
+    queryFn: fetchDebts,
+    enabled: Boolean(userId),
+  })
+  const debtPaymentsQuery = useQuery({
+    queryKey: ['debtPayments', userId],
+    queryFn: fetchDebtPayments,
     enabled: Boolean(userId),
   })
 
@@ -195,6 +213,25 @@ export function useStore() {
     mutationFn: (symbols: { symbol: string; assetType: AssetType }[]) => refreshInvestmentPrices(symbols),
     onSuccess: () => invalidate('investmentPrices'),
   })
+  const saveDebt = useMutation({
+    mutationFn: (d: Partial<Debt> & { id?: string }) => upsertDebt(userId!, d),
+    onSuccess: () => invalidate('debts'),
+  })
+  const removeDebt = useMutation({
+    mutationFn: (id: string) => apiDeleteDebt(id),
+    onSuccess: () => {
+      invalidate('debts')
+      invalidate('debtPayments')
+    },
+  })
+  const saveDebtPayment = useMutation({
+    mutationFn: (p: Partial<DebtPayment> & { id?: string; debtId: string }) => upsertDebtPayment(userId!, p),
+    onSuccess: () => invalidate('debtPayments'),
+  })
+  const removeDebtPayment = useMutation({
+    mutationFn: (id: string) => apiDeleteDebtPayment(id),
+    onSuccess: () => invalidate('debtPayments'),
+  })
   const duplicateBudgetMonth = useMutation({
     mutationFn: ({ fromSections, fromItemsBySection, toMonthKey }: {
       fromSections: BudgetSection[]
@@ -219,6 +256,8 @@ export function useStore() {
     investmentTransactions: investmentTransactionsQuery.data ?? ([] as InvestmentTransaction[]),
     investmentPrices: investmentPricesQuery.data ?? ({} as Record<string, number>),
     investmentsLastSynced: investmentsLastSyncedQuery.data ?? null,
+    debts: debtsQuery.data ?? ([] as Debt[]),
+    debtPayments: debtPaymentsQuery.data ?? ([] as DebtPayment[]),
     isLoading: transactionsQuery.isLoading || categoriesQuery.isLoading,
 
     addTransaction: (t: Transaction) => saveTransaction.mutate(t),
@@ -265,5 +304,10 @@ export function useStore() {
     refreshInvestmentPrices: (symbols: { symbol: string; assetType: AssetType }[]) =>
       refreshPrices.mutateAsync(symbols),
     isRefreshingPrices: refreshPrices.isPending,
+
+    saveDebt: (d: Partial<Debt> & { id?: string }) => saveDebt.mutate(d),
+    deleteDebt: (id: string) => removeDebt.mutate(id),
+    saveDebtPayment: (p: Partial<DebtPayment> & { id?: string; debtId: string }) => saveDebtPayment.mutate(p),
+    deleteDebtPayment: (id: string) => removeDebtPayment.mutate(id),
   }
 }

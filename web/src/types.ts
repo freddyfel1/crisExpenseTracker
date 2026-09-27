@@ -89,3 +89,26 @@ export interface InvestmentTransaction {
   date: string // ISO date
   notes: string | null
 }
+
+export type DebtType = 'mortgage' | 'personal_loan' | 'credit_card' | 'friend_loan' | 'other'
+
+export interface Debt {
+  id: string
+  name: string
+  debtType: DebtType
+  institution: string | null
+  principal: number // original loan amount
+  interestRate: number // annual %, 0 for a no-interest loan
+  termMonths: number // original term; 0 if open-ended/unknown
+  monthlyPayment: number
+  startDate: string // YYYY-MM-DD
+  notes: string | null
+}
+
+export interface DebtPayment {
+  id: string
+  debtId: string
+  date: string // ISO date
+  amount: number
+  notes: string | null
+}
