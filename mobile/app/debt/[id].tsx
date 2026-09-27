@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   content: { padding: 20, gap: 16, paddingBottom: 48 },
   label: { fontSize: 12, fontWeight: '600', color: colors.textSoft },
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  helperText: { flexShrink: 1, fontSize: 11, color: colors.textSoft, textAlign: 'right' },
+  helperText: { flexShrink: 1, fontSize: 11, fontWeight: '700', color: colors.textSoft, textAlign: 'right' },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

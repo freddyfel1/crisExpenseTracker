@@ -282,7 +282,7 @@ function DebtCard({
             <div className="flex items-baseline justify-end gap-2">
               <p className="font-mono text-[15px] font-medium text-[var(--warn)]">{formatMoney(balance)}</p>
               {totalWithInterest != null && (
-                <span className="whitespace-nowrap font-mono text-[11px] text-[var(--text-soft)]">
+                <span className="whitespace-nowrap font-mono text-[11px] font-semibold text-[var(--text-soft)]">
                   {formatMoney(totalWithInterest)} with interest
                 </span>
               )}
@@ -528,7 +528,7 @@ function DebtModal({
               <CurrencyCell value={debt.principal ?? 0} onCommit={(v) => onChange({ ...debt, principal: v })} />
             </div>
             {totalWithInterest != null && (
-              <span className="whitespace-nowrap text-[11px] text-[var(--text-soft)]">
+              <span className="whitespace-nowrap text-[11px] font-semibold text-[var(--text-soft)]">
                 {formatMoney(totalWithInterest)} with interest
               </span>
             )}

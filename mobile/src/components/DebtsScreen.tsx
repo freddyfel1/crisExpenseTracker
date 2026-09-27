@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   debtMeta: { fontSize: 12, color: colors.textSoft, marginTop: 2 },
   debtBalance: { fontSize: 15, fontWeight: '600', color: colors.warn, fontVariant: ['tabular-nums'] },
   debtSub: { fontSize: 11, color: colors.textSoft, fontVariant: ['tabular-nums'], marginTop: 2 },
-  debtWithInterest: { fontSize: 10, color: colors.textSoft, fontVariant: ['tabular-nums'], flexShrink: 1 },
+  debtWithInterest: { fontSize: 10, fontWeight: '700', color: colors.textSoft, fontVariant: ['tabular-nums'], flexShrink: 1 },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.paper, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.warn, borderRadius: 3 },
   progressLabel: { fontSize: 11.5, color: colors.textSoft },
