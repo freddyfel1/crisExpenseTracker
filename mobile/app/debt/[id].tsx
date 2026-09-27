@@ -3,9 +3,10 @@ import { ActivityIndicator, Alert, Platform, Pressable, SafeAreaView, ScrollView
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Trash2 } from 'lucide-react-native'
 import { useDebts, useDeleteDebt, useSaveDebt } from '../../src/hooks/useAppData'
-import { standardMonthlyPayment } from '../../src/data/selectors'
+import { projectAmortization, standardMonthlyPayment } from '../../src/data/selectors'
 import type { Debt, DebtType } from '../../src/types'
 import { colors } from '../../src/theme'
+import { formatMoney } from '../../src/utils/format'
 
 const DEBT_TYPES: { value: DebtType; label: string }[] = [
   { value: 'mortgage', label: 'Mortgage' },
@@ -66,6 +67,13 @@ export default function DebtDetail() {
     ])
   }
 
+  // Projects the full original loan (not the current balance) at its monthly payment to
+  // see what it actually costs over its life — principal plus every dollar of interest
+  // that payment schedule adds up to. Mirrors web's Debts.tsx DebtModal.
+  const schedule =
+    draft.monthlyPayment > 0 ? projectAmortization(draft.principal, draft.interestRate, draft.monthlyPayment) : []
+  const totalWithInterest = schedule.length > 0 ? draft.principal + schedule.reduce((sum, r) => sum + r.interest, 0) : null
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -104,6 +112,7 @@ export default function DebtDetail() {
           label="Original amount"
           value={draft.principal}
           onCommit={(v) => setDraft({ ...draft, principal: v })}
+          helper={totalWithInterest != null ? `${formatMoney(totalWithInterest)} total with interest` : undefined}
         />
 
         <NumberField
@@ -169,7 +178,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // Same "always clear on focus, empty text on blur means no change" pattern as
 // investment-transaction/[id].tsx's NumberField — see that file for the full rationale.
-function NumberField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+function NumberField({
+  label,
+  value,
+  onCommit,
+  helper,
+}: {
+  label: string
+  value: number
+  onCommit: (v: number) => void
+  helper?: string
+}) {
   const [text, setText] = useState(String(value))
   return (
     <Field label={label}>
@@ -186,6 +205,7 @@ function NumberField({ label, value, onCommit }: { label: string; value: number;
           setText(String(safe))
         }}
       />
+      {helper && <Text style={styles.helperText}>{helper}</Text>}
     </Field>
   )
 }
@@ -194,6 +214,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 48 },
   label: { fontSize: 12, fontWeight: '600', color: colors.textSoft },
+  helperText: { fontSize: 11, color: colors.textSoft },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
