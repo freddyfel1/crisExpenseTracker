@@ -10,6 +10,7 @@ import { BudgetPlanner } from './pages/BudgetPlanner'
 import { SavingsGoals } from './pages/SavingsGoals'
 import { Investments } from './pages/Investments'
 import { InvestmentsCrypto } from './pages/InvestmentsCrypto'
+import { Debts } from './pages/Debts'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
 import { HowTo } from './pages/HowTo'
@@ -31,6 +32,7 @@ function App() {
             <Route path="/savings-goals" element={<SavingsGoals />} />
             <Route path="/investments" element={<Investments />} />
             <Route path="/investments/crypto" element={<InvestmentsCrypto />} />
+            <Route path="/debts" element={<Debts />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/how-to" element={<HowTo />} />

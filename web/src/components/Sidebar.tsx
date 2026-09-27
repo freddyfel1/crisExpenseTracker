@@ -14,6 +14,7 @@ import {
   Upload,
   TrendingUp,
   Coins,
+  CreditCard,
 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { firstName } from '../utils/format'
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
     icon: TrendingUp,
     children: [{ to: '/investments/crypto', label: 'Crypto', icon: Coins }],
   },
+  { to: '/debts', label: 'Debts', icon: CreditCard },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
   { to: '/how-to', label: 'How To', icon: HelpCircle },

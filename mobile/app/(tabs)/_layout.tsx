@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import { Camera, FileSpreadsheet, LayoutDashboard, Receipt, Settings as SettingsIcon, TrendingUp } from 'lucide-react-native'
+import { Camera, CreditCard, FileSpreadsheet, LayoutDashboard, Receipt, Settings as SettingsIcon, TrendingUp } from 'lucide-react-native'
 import { colors } from '../../src/theme'
 
 export default function TabsLayout() {
@@ -31,6 +31,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="investments"
         options={{ title: 'Invest', tabBarIcon: ({ color, size }) => <TrendingUp color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="debts"
+        options={{ title: 'Debts', tabBarIcon: ({ color, size }) => <CreditCard color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="settings"

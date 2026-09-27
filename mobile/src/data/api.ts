@@ -5,6 +5,8 @@ import type {
   BudgetLineItem,
   BudgetSection,
   Category,
+  Debt,
+  DebtPayment,
   InvestmentAccount,
   InvestmentTransaction,
   MonthlyIncome,
@@ -357,6 +359,89 @@ export async function refreshInvestmentPrices(
   const { data, error } = await supabase.functions.invoke('finnhub-refresh-prices', { body: { symbols } })
   if (error) throw error
   return data
+}
+
+export async function fetchDebts(): Promise<Debt[]> {
+  const { data, error } = await supabase.from('debts').select('*').order('name')
+  if (error) throw error
+  return (
+    data as {
+      id: string
+      name: string
+      debt_type: Debt['debtType']
+      institution: string | null
+      principal: number
+      interest_rate: number
+      term_months: number
+      monthly_payment: number
+      start_date: string
+      notes: string | null
+    }[]
+  ).map((d) => ({
+    id: d.id,
+    name: d.name,
+    debtType: d.debt_type,
+    institution: d.institution,
+    principal: Number(d.principal),
+    interestRate: Number(d.interest_rate),
+    termMonths: d.term_months,
+    monthlyPayment: Number(d.monthly_payment),
+    startDate: d.start_date,
+    notes: d.notes,
+  }))
+}
+
+export async function upsertDebt(userId: string, d: Partial<Debt> & { id: string }) {
+  const { error } = await supabase.from('debts').upsert({
+    id: d.id,
+    user_id: userId,
+    name: d.name,
+    debt_type: d.debtType ?? 'other',
+    institution: d.institution ?? null,
+    principal: d.principal ?? 0,
+    interest_rate: d.interestRate ?? 0,
+    term_months: d.termMonths ?? 0,
+    monthly_payment: d.monthlyPayment ?? 0,
+    start_date: d.startDate,
+    notes: d.notes ?? null,
+  })
+  if (error) throw error
+}
+
+export async function deleteDebt(id: string) {
+  const { error } = await supabase.from('debts').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchDebtPayments(): Promise<DebtPayment[]> {
+  const { data, error } = await supabase.from('debt_payments').select('*').order('occurred_on', { ascending: false })
+  if (error) throw error
+  return (data as { id: string; debt_id: string; amount: number; occurred_on: string; notes: string | null }[]).map(
+    (p) => ({
+      id: p.id,
+      debtId: p.debt_id,
+      date: p.occurred_on,
+      amount: Number(p.amount),
+      notes: p.notes,
+    }),
+  )
+}
+
+export async function upsertDebtPayment(userId: string, p: Partial<DebtPayment> & { id: string; debtId: string }) {
+  const { error } = await supabase.from('debt_payments').upsert({
+    id: p.id,
+    user_id: userId,
+    debt_id: p.debtId,
+    amount: p.amount ?? 0,
+    occurred_on: p.date,
+    notes: p.notes ?? null,
+  })
+  if (error) throw error
+}
+
+export async function deleteDebtPayment(id: string) {
+  const { error } = await supabase.from('debt_payments').delete().eq('id', id)
+  if (error) throw error
 }
 
 export async function uploadReceiptPhoto(userId: string, localUri: string): Promise<string> {

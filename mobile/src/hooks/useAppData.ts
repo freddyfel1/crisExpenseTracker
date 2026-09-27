@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteBudgetLineItem,
   deleteBudgetSection,
+  deleteDebt,
+  deleteDebtPayment,
   deleteInvestmentAccount,
   deleteInvestmentTransaction,
   deleteTransaction,
@@ -9,6 +11,8 @@ import {
   fetchBudgetLineItems,
   fetchBudgetSections,
   fetchCategories,
+  fetchDebtPayments,
+  fetchDebts,
   fetchInvestmentAccounts,
   fetchInvestmentPrices,
   fetchInvestmentTransactions,
@@ -19,6 +23,8 @@ import {
   updateProfile,
   upsertBudgetLineItem,
   upsertBudgetSection,
+  upsertDebt,
+  upsertDebtPayment,
   upsertInvestmentAccount,
   upsertInvestmentTransaction,
   upsertMonthlyIncome,
@@ -28,6 +34,8 @@ import type {
   AssetType,
   BudgetLineItem,
   BudgetSection,
+  Debt,
+  DebtPayment,
   InvestmentAccount,
   InvestmentTransaction,
   Profile,
@@ -261,5 +269,62 @@ export function useRefreshInvestmentPrices() {
   return useMutation({
     mutationFn: (symbols: { symbol: string; assetType: AssetType }[]) => refreshInvestmentPrices(symbols),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['investmentPrices', session?.user.id] }),
+  })
+}
+
+export function useDebts() {
+  const { session } = useSession()
+  return useQuery({
+    queryKey: ['debts', session?.user.id],
+    queryFn: fetchDebts,
+    enabled: Boolean(session),
+  })
+}
+
+export function useSaveDebt() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (d: Partial<Debt> & { id: string }) => upsertDebt(session!.user.id, d),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['debts', session?.user.id] }),
+  })
+}
+
+export function useDeleteDebt() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteDebt(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['debts', session?.user.id] })
+      queryClient.invalidateQueries({ queryKey: ['debtPayments', session?.user.id] })
+    },
+  })
+}
+
+export function useDebtPayments() {
+  const { session } = useSession()
+  return useQuery({
+    queryKey: ['debtPayments', session?.user.id],
+    queryFn: fetchDebtPayments,
+    enabled: Boolean(session),
+  })
+}
+
+export function useSaveDebtPayment() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (p: Partial<DebtPayment> & { id: string; debtId: string }) => upsertDebtPayment(session!.user.id, p),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['debtPayments', session?.user.id] }),
+  })
+}
+
+export function useDeleteDebtPayment() {
+  const { session } = useSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteDebtPayment(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['debtPayments', session?.user.id] }),
   })
 }

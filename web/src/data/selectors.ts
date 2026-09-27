@@ -1,4 +1,13 @@
-import type { AssetType, BudgetLineItem, BudgetSection, InvestmentTransaction, MonthlyIncome, Transaction } from '../types'
+import type {
+  AssetType,
+  BudgetLineItem,
+  BudgetSection,
+  Debt,
+  DebtPayment,
+  InvestmentTransaction,
+  MonthlyIncome,
+  Transaction,
+} from '../types'
 import { monthKey } from '../utils/format'
 
 export const transactionsForMonth = (transactions: Transaction[], month: string): Transaction[] =>
@@ -239,6 +248,137 @@ export const budgetBySection = (
     }))
     .filter((s) => s.total > 0)
     .sort((a, b) => b.total - a.total)
+}
+
+// The fixed monthly payment a standard amortizing loan requires to pay off `principal`
+// over `termMonths` at `annualRatePct` — the textbook loan-payment formula. Falls back to
+// an even split when the rate is 0 (e.g. a no-interest loan to a friend).
+export const standardMonthlyPayment = (principal: number, annualRatePct: number, termMonths: number): number => {
+  if (termMonths <= 0) return 0
+  const monthlyRate = annualRatePct / 100 / 12
+  if (monthlyRate === 0) return principal / termMonths
+  const factor = Math.pow(1 + monthlyRate, termMonths)
+  return (principal * monthlyRate * factor) / (factor - 1)
+}
+
+export interface DebtLedgerEntry extends DebtPayment {
+  interest: number
+  principalPortion: number
+  balanceAfter: number
+}
+
+// Walks the actual logged payments in date order, splitting each one into interest
+// (balance * monthly rate) and principal — the same way a bank statement does — so the
+// running balance reflects what was really paid rather than just the original schedule.
+export const debtLedger = (debt: Debt, payments: DebtPayment[]): DebtLedgerEntry[] => {
+  const monthlyRate = debt.interestRate / 100 / 12
+  const sorted = payments.filter((p) => p.debtId === debt.id).sort((a, b) => a.date.localeCompare(b.date))
+
+  let balance = debt.principal
+  const entries: DebtLedgerEntry[] = []
+  for (const p of sorted) {
+    const interest = balance * monthlyRate
+    const principalPortion = Math.min(p.amount - interest, balance)
+    balance = Math.max(balance - principalPortion, 0)
+    entries.push({ ...p, interest, principalPortion, balanceAfter: balance })
+  }
+  return entries
+}
+
+export interface DebtStanding {
+  balance: number
+  totalPaid: number
+  totalInterestPaid: number
+  totalPrincipalPaid: number
+}
+
+export const debtStanding = (debt: Debt, payments: DebtPayment[]): DebtStanding => {
+  const ledger = debtLedger(debt, payments)
+  const last = ledger[ledger.length - 1]
+  return {
+    balance: last ? last.balanceAfter : debt.principal,
+    totalPaid: ledger.reduce((sum, e) => sum + e.amount, 0),
+    totalInterestPaid: ledger.reduce((sum, e) => sum + e.interest, 0),
+    totalPrincipalPaid: ledger.reduce((sum, e) => sum + e.principalPortion, 0),
+  }
+}
+
+export interface AmortizationRow {
+  month: number
+  date: string // YYYY-MM
+  payment: number
+  interest: number
+  principal: number
+  balance: number
+}
+
+// Projects a balance forward at a fixed rate and monthly payment until it hits zero —
+// the same math the early-repayment calculator below runs, just with a bigger payment.
+// Stops after `maxMonths` (50 years) as a safety net for a payment too small to ever
+// cover the accruing interest.
+export const projectAmortization = (
+  startBalance: number,
+  annualRatePct: number,
+  monthlyPayment: number,
+  fromDate = new Date(),
+  maxMonths = 600,
+): AmortizationRow[] => {
+  const monthlyRate = annualRatePct / 100 / 12
+  const rows: AmortizationRow[] = []
+  let balance = startBalance
+  let month = 0
+
+  while (balance > 0.005 && month < maxMonths) {
+    const interest = balance * monthlyRate
+    let principal = monthlyPayment - interest
+    if (principal <= 0) break // payment doesn't even cover interest — this never resolves
+    if (principal > balance) principal = balance
+    balance = Math.max(balance - principal, 0)
+    month += 1
+    const d = new Date(fromDate.getFullYear(), fromDate.getMonth() + month, 1)
+    rows.push({
+      month,
+      date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      payment: interest + principal,
+      interest,
+      principal,
+      balance,
+    })
+  }
+  return rows
+}
+
+export interface EarlyRepaymentComparison {
+  baseline: AmortizationRow[]
+  withExtra: AmortizationRow[]
+  monthsSaved: number
+  interestSaved: number
+  baselinePayoffDate: string | null
+  newPayoffDate: string | null
+}
+
+// Compares paying the standard monthly payment against adding a fixed extra amount on
+// top of it every month — the "what if I paid more" question behind the early-repayment
+// calculator, expressed as months and interest saved plus the new payoff date.
+export const compareEarlyRepayment = (
+  balance: number,
+  annualRatePct: number,
+  monthlyPayment: number,
+  extraPayment: number,
+): EarlyRepaymentComparison => {
+  const baseline = projectAmortization(balance, annualRatePct, monthlyPayment)
+  const withExtra =
+    extraPayment > 0 ? projectAmortization(balance, annualRatePct, monthlyPayment + extraPayment) : baseline
+  const baselineInterest = baseline.reduce((sum, r) => sum + r.interest, 0)
+  const extraInterest = withExtra.reduce((sum, r) => sum + r.interest, 0)
+  return {
+    baseline,
+    withExtra,
+    monthsSaved: Math.max(baseline.length - withExtra.length, 0),
+    interestSaved: Math.max(baselineInterest - extraInterest, 0),
+    baselinePayoffDate: baseline.length > 0 ? baseline[baseline.length - 1].date : null,
+    newPayoffDate: withExtra.length > 0 ? withExtra[withExtra.length - 1].date : null,
+  }
 }
 
 export const spendTrend = (transactions: Transaction[], monthsBack: number) => {
