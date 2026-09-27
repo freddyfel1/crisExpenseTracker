@@ -22,6 +22,60 @@ const DEBT_TYPE_ICONS: Record<DebtType, typeof Landmark> = {
   other: Landmark,
 }
 
+// Tapping into a number/currency cell always clears it, so there's no leading "0" to
+// select-and-delete before typing a real value — same fix already applied to the
+// investment-transaction fields. Uncontrolled (defaultValue, not value) so typing isn't
+// fought on every keystroke; commits on blur, and leaving it empty reverts to the prior
+// value rather than saving as 0 (Number('') is 0, not NaN — the usual footgun).
+function NumberCell({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      defaultValue={String(value)}
+      onFocus={(e) => {
+        e.target.value = ''
+      }}
+      onBlur={(e) => {
+        const next = e.target.value.trim() === '' ? value : Number(e.target.value)
+        const safe = Number.isNaN(next) ? value : next
+        onCommit(safe)
+        e.target.value = String(safe)
+      }}
+      className="input font-mono"
+    />
+  )
+}
+
+function CurrencyCell({
+  value,
+  onCommit,
+  autoFocus,
+}: {
+  value: number
+  onCommit: (v: number) => void
+  autoFocus?: boolean
+}) {
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      defaultValue={formatMoney(value)}
+      autoFocus={autoFocus}
+      onFocus={(e) => {
+        e.target.value = ''
+      }}
+      onBlur={(e) => {
+        const next = e.target.value.trim() === '' ? value : Number(e.target.value.replace(/[^0-9.-]/g, ''))
+        const safe = Number.isNaN(next) ? value : next
+        onCommit(safe)
+        e.target.value = formatMoney(safe)
+      }}
+      className="input font-mono"
+    />
+  )
+}
+
 function emptyDebt(): Partial<Debt> {
   return {
     name: '',
@@ -395,11 +449,24 @@ function DebtModal({
   onCancel: () => void
   onSave: () => void
 }) {
-  const suggestPayment = () => {
-    if (!debt.termMonths || debt.termMonths <= 0) return
-    const suggested = standardMonthlyPayment(debt.principal ?? 0, debt.interestRate ?? 0, debt.termMonths)
-    onChange({ ...debt, monthlyPayment: Math.round(suggested * 100) / 100 })
+  const commitTerm = (termMonths: number) => {
+    const suggested =
+      termMonths > 0 ? standardMonthlyPayment(debt.principal ?? 0, debt.interestRate ?? 0, termMonths) : debt.monthlyPayment ?? 0
+    onChange({
+      ...debt,
+      termMonths,
+      monthlyPayment: termMonths > 0 ? Math.round(suggested * 100) / 100 : (debt.monthlyPayment ?? 0),
+    })
   }
+
+  // Projects the full original loan (not the current balance) at its monthly payment to
+  // see what it actually costs over its life — principal plus every dollar of interest
+  // that payment schedule adds up to.
+  const schedule =
+    (debt.monthlyPayment ?? 0) > 0
+      ? projectAmortization(debt.principal ?? 0, debt.interestRate ?? 0, debt.monthlyPayment ?? 0)
+      : []
+  const totalWithInterest = schedule.length > 0 ? (debt.principal ?? 0) + schedule.reduce((sum, r) => sum + r.interest, 0) : null
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/30 p-4">
@@ -446,47 +513,28 @@ function DebtModal({
         <div className="mb-4 grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Original amount</span>
-            <input
-              type="number"
-              step="any"
-              value={debt.principal ?? 0}
-              onChange={(e) => onChange({ ...debt, principal: Number(e.target.value) })}
-              className="input font-mono"
-            />
+            <CurrencyCell value={debt.principal ?? 0} onCommit={(v) => onChange({ ...debt, principal: v })} />
+            {totalWithInterest != null && (
+              <p className="mt-1 text-[11px] text-[var(--text-soft)]">{formatMoney(totalWithInterest)} total with interest</p>
+            )}
           </label>
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Interest rate (annual %)</span>
-            <input
-              type="number"
-              step="any"
-              value={debt.interestRate ?? 0}
-              onChange={(e) => onChange({ ...debt, interestRate: Number(e.target.value) })}
-              className="input font-mono"
-            />
+            <NumberCell value={debt.interestRate ?? 0} onCommit={(v) => onChange({ ...debt, interestRate: v })} />
           </label>
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Term (months)</span>
-            <input
-              type="number"
-              step="1"
-              value={debt.termMonths ?? 0}
-              onChange={(e) => onChange({ ...debt, termMonths: Number(e.target.value) })}
-              onBlur={suggestPayment}
-              className="input font-mono"
-              placeholder="0 if open-ended"
-            />
+            <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Term (months, 0 if open-ended)</span>
+            <NumberCell value={debt.termMonths ?? 0} onCommit={commitTerm} />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Monthly payment</span>
-            <input
-              type="number"
-              step="any"
+            <CurrencyCell
+              key={debt.monthlyPayment}
               value={debt.monthlyPayment ?? 0}
-              onChange={(e) => onChange({ ...debt, monthlyPayment: Number(e.target.value) })}
-              className="input font-mono"
+              onCommit={(v) => onChange({ ...debt, monthlyPayment: v })}
             />
           </label>
         </div>
@@ -552,14 +600,7 @@ function PaymentModal({
         <div className="mb-4 grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Amount</span>
-            <input
-              type="number"
-              step="any"
-              value={payment.amount ?? 0}
-              onChange={(e) => onChange({ ...payment, amount: Number(e.target.value) })}
-              className="input font-mono"
-              autoFocus
-            />
+            <CurrencyCell value={payment.amount ?? 0} onCommit={(v) => onChange({ ...payment, amount: v })} autoFocus />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Date</span>
