@@ -233,21 +233,23 @@ function DebtCard({
                 : 'no scheduled payment set'}
           </Text>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-            <Text style={styles.debtBalance}>{formatMoney(balance)}</Text>
-            {totalWithInterest != null && (
-              <Text style={styles.debtWithInterest} numberOfLines={1}>
-                {formatMoney(totalWithInterest)} w/ interest
-              </Text>
-            )}
-          </View>
-          <Text style={styles.debtSub}>per month: {formatMoney(debt.monthlyPayment)}</Text>
-        </View>
         <Pressable onPress={onDelete} hitSlop={8}>
           <Trash2 size={15} color={colors.textSoft} />
         </Pressable>
       </Pressable>
+
+      {/* Its own full-width row, not squeezed alongside the name column above — cramming
+          the balance, the "with interest" total, and the name into one row wrapped the
+          debt's name a single character per line on a phone-width screen. */}
+      <View style={styles.balanceRow}>
+        <Text style={styles.debtBalance}>{formatMoney(balance)}</Text>
+        {totalWithInterest != null && (
+          <Text style={styles.debtWithInterest} numberOfLines={1}>
+            {formatMoney(totalWithInterest)} w/ interest
+          </Text>
+        )}
+      </View>
+      <Text style={styles.debtSub}>per month: {formatMoney(debt.monthlyPayment)}</Text>
 
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${pctRepaid}%` }]} />
@@ -336,8 +338,15 @@ const styles = StyleSheet.create({
   debtHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   debtName: { fontSize: 15, fontWeight: '600', color: colors.ink },
   debtMeta: { fontSize: 12, color: colors.textSoft, marginTop: 2 },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+  },
   debtBalance: { fontSize: 15, fontWeight: '600', color: colors.warn, fontVariant: ['tabular-nums'] },
-  debtSub: { fontSize: 11, color: colors.textSoft, fontVariant: ['tabular-nums'], marginTop: 2 },
+  debtSub: { fontSize: 11, color: colors.textSoft, fontVariant: ['tabular-nums'], marginTop: 2, textAlign: 'right' },
   debtWithInterest: { fontSize: 10, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'], flexShrink: 1 },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.paper, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.warn, borderRadius: 3 },
