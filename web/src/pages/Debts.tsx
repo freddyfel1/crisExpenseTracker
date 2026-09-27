@@ -236,6 +236,10 @@ function DebtCard({
     [balance, debt.interestRate, debt.monthlyPayment],
   )
   const paymentsLeft = projection.length
+  // What's left to pay from today, including every dollar of interest still to accrue —
+  // not the original loan's total, since past payments already covered some of that.
+  const totalWithInterest =
+    projection.length > 0 ? balance + projection.reduce((sum, r) => sum + r.interest, 0) : null
 
   const comparison = useMemo(
     () =>
@@ -275,7 +279,14 @@ function DebtCard({
         </div>
         <div className="flex items-center gap-2">
           <div className="text-right">
-            <p className="font-mono text-[15px] font-medium text-[var(--warn)]">{formatMoney(balance)}</p>
+            <div className="flex items-baseline justify-end gap-2">
+              <p className="font-mono text-[15px] font-medium text-[var(--warn)]">{formatMoney(balance)}</p>
+              {totalWithInterest != null && (
+                <span className="whitespace-nowrap font-mono text-[11px] text-[var(--text-soft)]">
+                  {formatMoney(totalWithInterest)} with interest
+                </span>
+              )}
+            </div>
             <p className="font-mono text-[11px] text-[var(--text-soft)]">per month: {formatMoney(debt.monthlyPayment)}</p>
           </div>
           <button

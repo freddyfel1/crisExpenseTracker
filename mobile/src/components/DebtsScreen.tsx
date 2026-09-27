@@ -195,10 +195,15 @@ function DebtCard({
   const pctRepaid = debt.principal > 0 ? Math.min(((debt.principal - balance) / debt.principal) * 100, 100) : 0
   const extraPayment = Math.max(Number(extraText) || 0, 0)
 
-  const paymentsLeft = useMemo(
-    () => (debt.monthlyPayment > 0 ? projectAmortization(balance, debt.interestRate, debt.monthlyPayment).length : 0),
+  const projection = useMemo(
+    () => (debt.monthlyPayment > 0 ? projectAmortization(balance, debt.interestRate, debt.monthlyPayment) : []),
     [balance, debt.interestRate, debt.monthlyPayment],
   )
+  const paymentsLeft = projection.length
+  // What's left to pay from today, including every dollar of interest still to accrue —
+  // not the original loan's total, since past payments already covered some of that.
+  const totalWithInterest =
+    projection.length > 0 ? balance + projection.reduce((sum, r) => sum + r.interest, 0) : null
 
   const comparison = useMemo(
     () =>
@@ -229,7 +234,14 @@ function DebtCard({
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={styles.debtBalance}>{formatMoney(balance)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={styles.debtBalance}>{formatMoney(balance)}</Text>
+            {totalWithInterest != null && (
+              <Text style={styles.debtWithInterest} numberOfLines={1}>
+                {formatMoney(totalWithInterest)} w/ interest
+              </Text>
+            )}
+          </View>
           <Text style={styles.debtSub}>per month: {formatMoney(debt.monthlyPayment)}</Text>
         </View>
         <Pressable onPress={onDelete} hitSlop={8}>
@@ -326,6 +338,7 @@ const styles = StyleSheet.create({
   debtMeta: { fontSize: 12, color: colors.textSoft, marginTop: 2 },
   debtBalance: { fontSize: 15, fontWeight: '600', color: colors.warn, fontVariant: ['tabular-nums'] },
   debtSub: { fontSize: 11, color: colors.textSoft, fontVariant: ['tabular-nums'], marginTop: 2 },
+  debtWithInterest: { fontSize: 10, color: colors.textSoft, fontVariant: ['tabular-nums'], flexShrink: 1 },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.paper, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.warn, borderRadius: 3 },
   progressLabel: { fontSize: 11.5, color: colors.textSoft },
