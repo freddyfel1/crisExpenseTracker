@@ -510,34 +510,39 @@ function DebtModal({
           </label>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Original amount</span>
-            <CurrencyCell value={debt.principal ?? 0} onCommit={(v) => onChange({ ...debt, principal: v })} />
+        <label className="mb-4 block">
+          <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Original amount</span>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <CurrencyCell value={debt.principal ?? 0} onCommit={(v) => onChange({ ...debt, principal: v })} />
+            </div>
             {totalWithInterest != null && (
-              <p className="mt-1 text-[11px] text-[var(--text-soft)]">{formatMoney(totalWithInterest)} total with interest</p>
+              <span className="whitespace-nowrap text-[11px] text-[var(--text-soft)]">
+                {formatMoney(totalWithInterest)} with interest
+              </span>
             )}
-          </label>
+          </div>
+        </label>
+
+        <div className="mb-4 grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Interest rate (annual %)</span>
             <NumberCell value={debt.interestRate ?? 0} onCommit={(v) => onChange({ ...debt, interestRate: v })} />
           </label>
-        </div>
-
-        <div className="mb-4 grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Term (months, 0 if open-ended)</span>
             <NumberCell value={debt.termMonths ?? 0} onCommit={commitTerm} />
           </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Monthly payment</span>
-            <CurrencyCell
-              key={debt.monthlyPayment}
-              value={debt.monthlyPayment ?? 0}
-              onCommit={(v) => onChange({ ...debt, monthlyPayment: v })}
-            />
-          </label>
         </div>
+
+        <label className="mb-4 block">
+          <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Monthly payment</span>
+          <CurrencyCell
+            key={debt.monthlyPayment}
+            value={debt.monthlyPayment ?? 0}
+            onCommit={(v) => onChange({ ...debt, monthlyPayment: v })}
+          />
+        </label>
 
         <label className="mb-6 block">
           <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Start date</span>

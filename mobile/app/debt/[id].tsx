@@ -112,7 +112,7 @@ export default function DebtDetail() {
           label="Original amount"
           value={draft.principal}
           onCommit={(v) => setDraft({ ...draft, principal: v })}
-          helper={totalWithInterest != null ? `${formatMoney(totalWithInterest)} total with interest` : undefined}
+          helper={totalWithInterest != null ? `${formatMoney(totalWithInterest)} with interest` : undefined}
         />
 
         <NumberField
@@ -192,20 +192,26 @@ function NumberField({
   const [text, setText] = useState(String(value))
   return (
     <Field label={label}>
-      <TextInput
-        style={styles.input}
-        keyboardType="decimal-pad"
-        value={text}
-        onChangeText={setText}
-        onFocus={() => setText('')}
-        onBlur={() => {
-          const next = text.trim() === '' ? value : Number(text)
-          const safe = Number.isNaN(next) ? value : next
-          onCommit(safe)
-          setText(String(safe))
-        }}
-      />
-      {helper && <Text style={styles.helperText}>{helper}</Text>}
+      <View style={styles.fieldRow}>
+        <TextInput
+          style={[styles.input, helper ? { flex: 1 } : undefined]}
+          keyboardType="decimal-pad"
+          value={text}
+          onChangeText={setText}
+          onFocus={() => setText('')}
+          onBlur={() => {
+            const next = text.trim() === '' ? value : Number(text)
+            const safe = Number.isNaN(next) ? value : next
+            onCommit(safe)
+            setText(String(safe))
+          }}
+        />
+        {helper && (
+          <Text style={styles.helperText} numberOfLines={2}>
+            {helper}
+          </Text>
+        )}
+      </View>
     </Field>
   )
 }
@@ -214,7 +220,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 48 },
   label: { fontSize: 12, fontWeight: '600', color: colors.textSoft },
-  helperText: { fontSize: 11, color: colors.textSoft },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  helperText: { flexShrink: 1, fontSize: 11, color: colors.textSoft, textAlign: 'right' },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
