@@ -460,7 +460,12 @@ function DebtModal({
   onCancel: () => void
   onSave: () => void
 }) {
+  // Only recomputes the suggested payment when Term actually changed to a new value —
+  // this cell's onBlur fires on every focus/blur regardless of whether the text changed,
+  // and recomputing unconditionally would silently overwrite a real payment amount you'd
+  // already entered (e.g. one that includes escrow) just from tabbing through the field.
   const commitTerm = (termMonths: number) => {
+    if (termMonths === (debt.termMonths ?? 0)) return
     const suggested =
       termMonths > 0 ? standardMonthlyPayment(debt.principal ?? 0, debt.interestRate ?? 0, termMonths) : debt.monthlyPayment ?? 0
     onChange({
