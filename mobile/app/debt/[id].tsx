@@ -125,6 +125,10 @@ export default function DebtDetail() {
           label="Term (months, 0 if open-ended)"
           value={draft.termMonths}
           onCommit={(v) => {
+            // This field's onBlur fires on every focus/blur regardless of whether the text
+            // changed, so recomputing unconditionally would silently overwrite a real
+            // payment amount already entered (e.g. one that includes escrow).
+            if (v === draft.termMonths) return
             const suggested = v > 0 ? standardMonthlyPayment(draft.principal, draft.interestRate, v) : draft.monthlyPayment
             setDraft({ ...draft, termMonths: v, monthlyPayment: v > 0 ? Math.round(suggested * 100) / 100 : draft.monthlyPayment })
           }}
