@@ -17,6 +17,7 @@ import { Card } from '../components/Card'
 import { StatCard } from '../components/StatCard'
 import { EditableStatCard } from '../components/EditableStatCard'
 import { MonthPicker } from '../components/MonthPicker'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { CategoryBreakdown } from '../components/CategoryBreakdown'
 import { BudgetBreakdown } from '../components/BudgetBreakdown'
 import { SpendTrend } from '../components/SpendTrend'
@@ -60,7 +61,10 @@ export function Dashboard() {
             Your financial position for {monthKeyLabel(month)}
           </p>
         </div>
-        <MonthPicker />
+        <div className="flex flex-wrap items-center gap-2">
+          <ThemeToggle />
+          <MonthPicker />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

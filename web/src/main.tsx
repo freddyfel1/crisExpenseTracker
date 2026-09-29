@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App.tsx'
 import { PeriodProvider } from './data/period'
+import { ThemeProvider } from './data/theme'
 import { ConnectSupabaseScreen } from './components/ConnectSupabaseScreen'
 import { SignInScreen } from './components/SignInScreen'
 import { ResetPasswordScreen } from './components/ResetPasswordScreen'
@@ -30,10 +31,12 @@ function Gate() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Gate />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Gate />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 )
