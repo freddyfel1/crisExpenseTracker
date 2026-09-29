@@ -269,8 +269,6 @@ export function Investments() {
     isDragging,
     registerRef,
     handlePointerDown,
-    handlePointerMove,
-    handlePointerUp,
   } = useDragReorder(nonCryptoAccounts, (orderedIds) => {
     orderedIds.forEach((id, index) => {
       const account = nonCryptoAccounts.find((a) => a.id === id)
@@ -401,8 +399,6 @@ export function Investments() {
               cardRef={registerRef(account.id)}
               isDragging={isDragging(account.id)}
               onGripPointerDown={handlePointerDown(account.id)}
-              onGripPointerMove={handlePointerMove}
-              onGripPointerUp={handlePointerUp}
             />
           ))}
         </div>
@@ -619,8 +615,6 @@ function AccountCard({
   cardRef,
   isDragging,
   onGripPointerDown,
-  onGripPointerMove,
-  onGripPointerUp,
 }: {
   account: InvestmentAccount
   transactions: InvestmentTransaction[]
@@ -633,8 +627,6 @@ function AccountCard({
   cardRef: (el: HTMLElement | null) => void
   isDragging: boolean
   onGripPointerDown: (e: React.PointerEvent<HTMLElement>) => void
-  onGripPointerMove: (e: React.PointerEvent<HTMLElement>) => void
-  onGripPointerUp: () => void
 }) {
   const holdings = holdingsForAccount(transactions, account.id)
   const accountCostBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
@@ -648,8 +640,6 @@ function AccountCard({
         <div className="flex items-start gap-2">
           <span
             onPointerDown={onGripPointerDown}
-            onPointerMove={onGripPointerMove}
-            onPointerUp={onGripPointerUp}
             className="mt-1 touch-none cursor-grab text-[var(--text-soft)] hover:text-[var(--ink)] active:cursor-grabbing"
             title="Drag to reorder account"
           >
