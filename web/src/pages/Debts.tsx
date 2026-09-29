@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronUp, CreditCard, HandCoins, Landmark, Pencil, Plus, TrendingDown, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, CreditCard, GripVertical, HandCoins, Landmark, Pencil, Plus, TrendingDown, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
+import { useDragReorder } from '../hooks/useDragReorder'
 import { compareEarlyRepayment, debtLedger, debtStanding, projectAmortization, standardMonthlyPayment } from '../data/selectors'
 import { formatDate, formatMoney } from '../utils/format'
 import { StatCard } from '../components/StatCard'
@@ -123,6 +124,22 @@ export function Debts() {
     setEditingPayment(null)
   }
 
+  const {
+    displayItems: displayDebts,
+    isDragging,
+    registerRef,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+  } = useDragReorder(debts, (orderedIds) => {
+    orderedIds.forEach((id, index) => {
+      const debt = debts.find((d) => d.id === id)
+      if (debt && debt.sortOrder !== index) {
+        saveDebt({ ...debt, sortOrder: index })
+      }
+    })
+  })
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -131,7 +148,7 @@ export function Debts() {
           <p className="text-[13px] text-[var(--text-soft)]">Your loans and credit, and what's left to pay off.</p>
         </div>
         <button
-          onClick={() => setEditingDebt(emptyDebt())}
+          onClick={() => setEditingDebt({ ...emptyDebt(), sortOrder: debts.length })}
           className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
         >
           <Plus size={15} /> Add a debt
@@ -166,7 +183,7 @@ export function Debts() {
       )}
 
       <div className="space-y-4">
-        {debts.map((debt) => (
+        {displayDebts.map((debt) => (
           <DebtCard
             key={debt.id}
             debt={debt}
@@ -181,6 +198,11 @@ export function Debts() {
             onDeletePayment={(id) => {
               if (window.confirm('Delete this payment? This cannot be undone.')) deleteDebtPayment(id)
             }}
+            cardRef={registerRef(debt.id)}
+            isDragging={isDragging(debt.id)}
+            onGripPointerDown={handlePointerDown(debt.id)}
+            onGripPointerMove={handlePointerMove}
+            onGripPointerUp={handlePointerUp}
           />
         ))}
       </div>
@@ -215,6 +237,11 @@ function DebtCard({
   onAddPayment,
   onEditPayment,
   onDeletePayment,
+  cardRef,
+  isDragging,
+  onGripPointerDown,
+  onGripPointerMove,
+  onGripPointerUp,
 }: {
   debt: Debt
   payments: DebtPayment[]
@@ -223,6 +250,11 @@ function DebtCard({
   onAddPayment: () => void
   onEditPayment: (p: DebtPayment) => void
   onDeletePayment: (id: string) => void
+  cardRef: (el: HTMLElement | null) => void
+  isDragging: boolean
+  onGripPointerDown: (e: React.PointerEvent<HTMLElement>) => void
+  onGripPointerMove: (e: React.PointerEvent<HTMLElement>) => void
+  onGripPointerUp: () => void
 }) {
   const [showSchedule, setShowSchedule] = useState(false)
   const [extraPayment, setExtraPayment] = useState(0)
@@ -253,9 +285,19 @@ function DebtCard({
   const sortedLedger = [...ledger].reverse()
 
   return (
+    <div ref={cardRef} className={`rounded-xl transition-opacity ${isDragging ? 'opacity-40' : ''}`}>
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
+          <span
+            onPointerDown={onGripPointerDown}
+            onPointerMove={onGripPointerMove}
+            onPointerUp={onGripPointerUp}
+            className="mt-1.5 touch-none cursor-grab text-[var(--text-soft)] hover:text-[var(--ink)] active:cursor-grabbing"
+            title="Drag to reorder debt"
+          >
+            <GripVertical size={15} />
+          </span>
           <div className="mt-0.5 grid h-9 w-9 place-items-center rounded-lg bg-[var(--paper)] text-[var(--text-soft)]">
             <Icon size={16} />
           </div>
@@ -445,6 +487,7 @@ function DebtCard({
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { DollarSign, FileText, Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
+import { DollarSign, FileText, GripVertical, Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
+import { useDragReorder } from '../hooks/useDragReorder'
 import { holdingsForAccount, marketValue, mergeHoldingsBySymbol, totalInvested } from '../data/selectors'
 import { syncPlaidInvestments } from '../data/api'
 import { useSession } from '../hooks/useSession'
@@ -102,9 +103,9 @@ export function InvestmentsAssetPage({
   // would show up nowhere until its first transaction was logged.
   const pageAccounts = useMemo(
     () =>
-      investmentAccounts.filter(
-        (a) => a.accountType === defaultAccountType || pageTransactions.some((t) => t.accountId === a.id),
-      ),
+      investmentAccounts
+        .filter((a) => a.accountType === defaultAccountType || pageTransactions.some((t) => t.accountId === a.id))
+        .sort((a, b) => a.sortOrder - b.sortOrder),
     [investmentAccounts, pageTransactions, defaultAccountType],
   )
 
@@ -291,6 +292,22 @@ export function InvestmentsAssetPage({
     setEditingTransaction(emptyTransaction(pageAccounts[0].id, defaultAssetType))
   }
 
+  const {
+    displayItems: displayAccounts,
+    isDragging,
+    registerRef,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+  } = useDragReorder(pageAccounts, (orderedIds) => {
+    orderedIds.forEach((id, index) => {
+      const account = pageAccounts.find((a) => a.id === id)
+      if (account && account.sortOrder !== index) {
+        saveInvestmentAccount({ ...account, sortOrder: index })
+      }
+    })
+  })
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -334,7 +351,14 @@ export function InvestmentsAssetPage({
             <Plus size={15} /> Add transaction
           </button>
           <button
-            onClick={() => setEditingAccount({ name: '', institution: '', accountType: defaultAccountType })}
+            onClick={() =>
+              setEditingAccount({
+                name: '',
+                institution: '',
+                accountType: defaultAccountType,
+                sortOrder: pageAccounts.length,
+              })
+            }
             className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
           >
             <Plus size={15} /> Add account
@@ -383,7 +407,7 @@ export function InvestmentsAssetPage({
       {pageAccounts.length === 0 && <p className="text-[13px] text-[var(--text-soft)]">{emptyHint}</p>}
 
       <div className="space-y-4">
-        {pageAccounts.map((account) => (
+        {displayAccounts.map((account) => (
           <AccountCard
             key={account.id}
             account={account}
@@ -399,6 +423,11 @@ export function InvestmentsAssetPage({
             onDeleteTransaction={(id) => {
               if (window.confirm('Delete this transaction? This cannot be undone.')) deleteInvestmentTransaction(id)
             }}
+            cardRef={registerRef(account.id)}
+            isDragging={isDragging(account.id)}
+            onGripPointerDown={handlePointerDown(account.id)}
+            onGripPointerMove={handlePointerMove}
+            onGripPointerUp={handlePointerUp}
           />
         ))}
       </div>
@@ -625,6 +654,11 @@ function AccountCard({
   onAddTransaction,
   onEditTransaction,
   onDeleteTransaction,
+  cardRef,
+  isDragging,
+  onGripPointerDown,
+  onGripPointerMove,
+  onGripPointerUp,
 }: {
   account: InvestmentAccount
   transactions: InvestmentTransaction[]
@@ -634,6 +668,11 @@ function AccountCard({
   onAddTransaction: () => void
   onEditTransaction: (t: InvestmentTransaction) => void
   onDeleteTransaction: (id: string) => void
+  cardRef: (el: HTMLElement | null) => void
+  isDragging: boolean
+  onGripPointerDown: (e: React.PointerEvent<HTMLElement>) => void
+  onGripPointerMove: (e: React.PointerEvent<HTMLElement>) => void
+  onGripPointerUp: () => void
 }) {
   const holdings = holdingsForAccount(transactions, account.id)
   const accountCostBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
@@ -641,9 +680,20 @@ function AccountCard({
   const sortedTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+    <div ref={cardRef} className={`rounded-xl transition-opacity ${isDragging ? 'opacity-40' : ''}`}>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="flex items-start gap-2">
+          <span
+            onPointerDown={onGripPointerDown}
+            onPointerMove={onGripPointerMove}
+            onPointerUp={onGripPointerUp}
+            className="mt-1 touch-none cursor-grab text-[var(--text-soft)] hover:text-[var(--ink)] active:cursor-grabbing"
+            title="Drag to reorder account"
+          >
+            <GripVertical size={15} />
+          </span>
+          <div>
           <div className="flex items-center gap-2">
             <p className="text-[15px] font-semibold text-[var(--ink)]">{account.name}</p>
             <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[11px] text-[var(--text-soft)]">
@@ -651,6 +701,7 @@ function AccountCard({
             </span>
           </div>
           {account.institution && <p className="text-[12px] text-[var(--text-soft)]">{account.institution}</p>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="text-right">
@@ -783,6 +834,7 @@ function AccountCard({
           </table>
         </div>
       )}
+      </div>
     </div>
   )
 }
