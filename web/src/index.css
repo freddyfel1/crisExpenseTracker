@@ -24,6 +24,26 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
 }
 
+:root[data-theme='dark'] {
+  --paper: #14160f;
+  --surface: #1c1f17;
+  --ink: #eef1e9;
+  --text: #c7ccc0;
+  --text-soft: #8b9184;
+  --border: #33382c;
+  --border-soft: #262b20;
+
+  --primary: #4c9d74;
+  --primary-ink: #8fe0b8;
+  --primary-soft: #1f3b2c;
+
+  --warn: #e0796a;
+  --warn-soft: #3a2420;
+
+  --gold: #d9b25c;
+  --gold-soft: #3a3020;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -38,6 +58,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--text);
+  transition: background-color 0.15s ease, color 0.15s ease;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
