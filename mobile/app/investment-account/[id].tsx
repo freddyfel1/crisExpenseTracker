@@ -8,7 +8,8 @@ import {
   useSaveInvestmentAccount,
 } from '../../src/hooks/useAppData'
 import type { InvestmentAccount, InvestmentAccountType } from '../../src/types'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 
 const ACCOUNT_TYPES: { value: InvestmentAccountType; label: string }[] = [
   { value: 'brokerage', label: 'Brokerage' },
@@ -23,6 +24,8 @@ export default function InvestmentAccountDetail() {
   const accounts = useInvestmentAccounts()
   const saveAccount = useSaveInvestmentAccount()
   const deleteAccount = useDeleteInvestmentAccount()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
 
   const existing = accounts.data?.find((a) => a.id === id)
   const [draft, setDraft] = useState<InvestmentAccount | null>(existing ?? null)
@@ -71,11 +74,11 @@ export default function InvestmentAccountDetail() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Field label="Name">
+        <Field styles={styles} label="Name">
           <TextInput style={styles.input} value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} />
         </Field>
 
-        <Field label="Institution (optional)">
+        <Field styles={styles} label="Institution (optional)">
           <TextInput
             style={styles.input}
             value={draft.institution ?? ''}
@@ -84,7 +87,7 @@ export default function InvestmentAccountDetail() {
           />
         </Field>
 
-        <Field label="Account type">
+        <Field styles={styles} label="Account type">
           <View style={styles.chipRow}>
             {ACCOUNT_TYPES.map(({ value, label }) => (
               <Pressable
@@ -119,7 +122,15 @@ export default function InvestmentAccountDetail() {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  styles,
+  label,
+  children,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
@@ -128,7 +139,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 48 },
   label: { fontSize: 12, fontWeight: '600', color: colors.textSoft },
@@ -161,4 +173,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-})
+  })
+}

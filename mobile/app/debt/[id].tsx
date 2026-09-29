@@ -5,7 +5,8 @@ import { Trash2 } from 'lucide-react-native'
 import { useDebts, useDeleteDebt, useSaveDebt } from '../../src/hooks/useAppData'
 import { projectAmortization, standardMonthlyPayment } from '../../src/data/selectors'
 import type { Debt, DebtType } from '../../src/types'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 import { formatMoney } from '../../src/utils/format'
 
 const DEBT_TYPES: { value: DebtType; label: string }[] = [
@@ -22,6 +23,8 @@ export default function DebtDetail() {
   const debts = useDebts()
   const saveDebt = useSaveDebt()
   const deleteDebt = useDeleteDebt()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
 
   const existing = debts.data?.find((d) => d.id === id)
   const [draft, setDraft] = useState<Debt | null>(existing ?? null)
@@ -77,11 +80,11 @@ export default function DebtDetail() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Field label="Name">
+        <Field styles={styles} label="Name">
           <TextInput style={styles.input} value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} />
         </Field>
 
-        <Field label="Type">
+        <Field styles={styles} label="Type">
           <View style={styles.chipRow}>
             {DEBT_TYPES.map(({ value, label }) => (
               <Pressable
@@ -99,7 +102,7 @@ export default function DebtDetail() {
           </View>
         </Field>
 
-        <Field label="Institution (optional)">
+        <Field styles={styles} label="Institution (optional)">
           <TextInput
             style={styles.input}
             value={draft.institution ?? ''}
@@ -109,6 +112,7 @@ export default function DebtDetail() {
         </Field>
 
         <NumberField
+          styles={styles}
           label="Original amount"
           value={draft.principal}
           onCommit={(v) => setDraft({ ...draft, principal: v })}
@@ -116,12 +120,14 @@ export default function DebtDetail() {
         />
 
         <NumberField
+          styles={styles}
           label="Interest rate (annual %)"
           value={draft.interestRate}
           onCommit={(v) => setDraft({ ...draft, interestRate: v })}
         />
 
         <NumberField
+          styles={styles}
           label="Term (months, 0 if open-ended)"
           value={draft.termMonths}
           onCommit={(v) => {
@@ -135,12 +141,13 @@ export default function DebtDetail() {
         />
 
         <NumberField
+          styles={styles}
           label="Monthly payment"
           value={draft.monthlyPayment}
           onCommit={(v) => setDraft({ ...draft, monthlyPayment: v })}
         />
 
-        <Field label="Start date">
+        <Field styles={styles} label="Start date">
           <TextInput
             style={styles.input}
             value={draft.startDate.slice(0, 10)}
@@ -149,7 +156,7 @@ export default function DebtDetail() {
           />
         </Field>
 
-        <Field label="Notes">
+        <Field styles={styles} label="Notes">
           <TextInput
             style={[styles.input, { height: 72 }]}
             multiline
@@ -171,7 +178,15 @@ export default function DebtDetail() {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  styles,
+  label,
+  children,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
@@ -183,11 +198,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // Same "always clear on focus, empty text on blur means no change" pattern as
 // investment-transaction/[id].tsx's NumberField — see that file for the full rationale.
 function NumberField({
+  styles,
   label,
   value,
   onCommit,
   helper,
 }: {
+  styles: ReturnType<typeof makeStyles>
   label: string
   value: number
   onCommit: (v: number) => void
@@ -195,7 +212,7 @@ function NumberField({
 }) {
   const [text, setText] = useState(String(value))
   return (
-    <Field label={label}>
+    <Field styles={styles} label={label}>
       <View style={styles.fieldRow}>
         <TextInput
           style={[styles.input, helper ? { flex: 1 } : undefined]}
@@ -220,7 +237,8 @@ function NumberField({
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 48 },
   label: { fontSize: 12, fontWeight: '600', color: colors.textSoft },
@@ -255,4 +273,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-})
+  })
+}

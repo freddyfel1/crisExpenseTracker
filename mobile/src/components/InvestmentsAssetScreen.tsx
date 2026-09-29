@@ -17,7 +17,8 @@ import {
 import { holdingsForAccount, marketValue, mergeHoldingsBySymbol, totalInvested } from '../data/selectors'
 import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction } from '../types'
 import { formatMoney } from '../utils/format'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import { lightColors, type ThemeColors } from '../theme'
 import { HoldingsGainLoss } from './HoldingsGainLoss'
 
 const ACCOUNT_TYPE_LABELS: Record<InvestmentAccountType, string> = {
@@ -85,6 +86,8 @@ export function InvestmentsAssetScreen({
   const saveTransaction = useSaveInvestmentTransaction()
   const refreshPrices = useRefreshInvestmentPrices()
   const router = useRouter()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const accountList = accounts.data ?? []
@@ -237,15 +240,17 @@ export function InvestmentsAssetScreen({
 
         <View style={styles.card}>
           <View style={styles.summaryGrid}>
-            <SummaryStat label="Invested" value={formatMoney(invested)} />
-            <SummaryStat label="Market value" value={formatMoney(portfolioValue)} />
+            <SummaryStat styles={styles} colors={colors} label="Invested" value={formatMoney(invested)} />
+            <SummaryStat styles={styles} colors={colors} label="Market value" value={formatMoney(portfolioValue)} />
             <SummaryStat
+              styles={styles}
+              colors={colors}
               label="Gain/loss"
               value={`${unrealizedGain >= 0 ? '+' : ''}${formatMoney(unrealizedGain)}`}
               tone={unrealizedGain < 0 ? 'warn' : 'good'}
             />
-            <SummaryStat label="Accounts" value={String(pageAccounts.length)} />
-            <SummaryStat label="Holdings" value={String(holdingCount)} />
+            <SummaryStat styles={styles} colors={colors} label="Accounts" value={String(pageAccounts.length)} />
+            <SummaryStat styles={styles} colors={colors} label="Holdings" value={String(holdingCount)} />
           </View>
         </View>
 
@@ -264,6 +269,8 @@ export function InvestmentsAssetScreen({
             {pageAccounts.map((account) => (
               <AccountCard
                 key={account.id}
+                styles={styles}
+                colors={colors}
                 account={account}
                 transactions={pageTransactions.filter((t) => t.accountId === account.id)}
                 prices={priceMap}
@@ -289,7 +296,19 @@ export function InvestmentsAssetScreen({
   )
 }
 
-function SummaryStat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' }) {
+function SummaryStat({
+  styles,
+  colors,
+  label,
+  value,
+  tone,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
+  label: string
+  value: string
+  tone?: 'good' | 'warn'
+}) {
   return (
     <View style={styles.summaryStat}>
       <Text style={styles.summaryLabel}>{label}</Text>
@@ -307,6 +326,8 @@ function SummaryStat({ label, value, tone }: { label: string; value: string; ton
 }
 
 function AccountCard({
+  styles,
+  colors,
   account,
   transactions,
   prices,
@@ -315,6 +336,8 @@ function AccountCard({
   onAddTransaction,
   onOpenTransaction,
 }: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
   account: InvestmentAccount
   transactions: InvestmentTransaction[]
   prices: Record<string, number>
@@ -471,26 +494,29 @@ function buildInvestmentsHtml({
     })
     .join('')
 
+  // Always the light palette, not the app's current theme — an exported PDF is meant to
+  // be read/printed on plain white regardless of whether the app itself is in dark mode.
+  const pdfColors = lightColors
   return `<!DOCTYPE html>
   <html>
   <head>
     <meta charset="utf-8" />
     <style>
-      body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 24px; color: ${colors.ink}; }
+      body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 24px; color: ${pdfColors.ink}; }
       h1 { font-size: 22px; margin: 0 0 4px; }
-      .subtitle { color: ${colors.textSoft}; font-size: 13px; margin: 0 0 16px; }
+      .subtitle { color: ${pdfColors.textSoft}; font-size: 13px; margin: 0 0 16px; }
       .summary { font-size: 13px; margin-bottom: 20px; }
       .account { margin-bottom: 20px; page-break-inside: avoid; }
       .account-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; }
-      .account-meta { color: ${colors.textSoft}; font-size: 11px; margin-bottom: 6px; }
+      .account-meta { color: ${pdfColors.textSoft}; font-size: 11px; margin-bottom: 6px; }
       table { width: 100%; border-collapse: collapse; font-size: 11px; }
-      th { background: ${colors.ink}; color: #fff; text-align: right; padding: 6px 8px; }
+      th { background: ${pdfColors.ink}; color: #fff; text-align: right; padding: 6px 8px; }
       th:first-child { text-align: left; }
-      td { padding: 6px 8px; border-bottom: 1px solid ${colors.borderSoft}; text-align: right; }
+      td { padding: 6px 8px; border-bottom: 1px solid ${pdfColors.borderSoft}; text-align: right; }
       td:first-child { text-align: left; font-weight: 600; }
-      .gain { color: ${colors.primary}; }
-      .loss { color: ${colors.warn}; }
-      .empty { color: ${colors.textSoft}; font-size: 12px; }
+      .gain { color: ${pdfColors.primary}; }
+      .loss { color: ${pdfColors.warn}; }
+      .empty { color: ${pdfColors.textSoft}; font-size: 12px; }
     </style>
   </head>
   <body>
@@ -507,7 +533,8 @@ function buildInvestmentsHtml({
   </html>`
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
@@ -580,4 +607,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   addAccountText: { fontSize: 13, fontWeight: '600', color: colors.textSoft },
-})
+  })
+}

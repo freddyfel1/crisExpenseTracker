@@ -4,12 +4,15 @@ import { LogOut } from 'lucide-react-native'
 import { useProfile, useUpdateProfile } from '../../src/hooks/useAppData'
 import { useSession } from '../../src/hooks/useSession'
 import { supabase } from '../../src/lib/supabase'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 
 export default function Settings() {
   const { session } = useSession()
   const profile = useProfile()
   const updateProfile = useUpdateProfile()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const [name, setName] = useState(profile.data?.name ?? '')
   const [nameSeeded, setNameSeeded] = useState(false)
 
@@ -43,7 +46,7 @@ export default function Settings() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Account</Text>
-          <Field label="Name">
+          <Field styles={styles} label="Name">
             <TextInput
               style={styles.input}
               value={name}
@@ -58,18 +61,24 @@ export default function Settings() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Notifications</Text>
           <Row
+            styles={styles}
+            colors={colors}
             label="Budget alerts"
             sub="Get notified when a category nears its limit"
             value={profile.data.notifyBudgetAlerts}
             onChange={toggle('notifyBudgetAlerts')}
           />
           <Row
+            styles={styles}
+            colors={colors}
             label="Weekly summary"
             sub="A recap of spending every Monday"
             value={profile.data.notifyWeeklySummary}
             onChange={toggle('notifyWeeklySummary')}
           />
           <Row
+            styles={styles}
+            colors={colors}
             label="Receipt sync"
             sub="Notify when a new receipt syncs from the web app"
             value={profile.data.notifyReceiptSync}
@@ -90,7 +99,15 @@ export default function Settings() {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  styles,
+  label,
+  children,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -100,11 +117,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Row({
+  styles,
+  colors,
   label,
   sub,
   value,
   onChange,
 }: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
   label: string
   sub: string
   value: boolean
@@ -121,7 +142,8 @@ function Row({
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
@@ -162,4 +184,5 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   signOutText: { color: colors.warn, fontWeight: '600', fontSize: 14 },
-})
+  })
+}

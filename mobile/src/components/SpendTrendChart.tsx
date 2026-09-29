@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native'
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 
 interface Props {
   data: { key: string; label: string; total: number }[]
@@ -12,6 +13,8 @@ const PADDING_TOP = 10
 const PADDING_BOTTOM = 22
 
 export function SpendTrendChart({ data }: Props) {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const [width, setWidth] = useState(0)
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)
 
@@ -55,8 +58,10 @@ export function SpendTrendChart({ data }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { width: '100%', height: HEIGHT },
-  labels: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between' },
-  label: { fontSize: 11, color: colors.textSoft },
-})
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { width: '100%', height: HEIGHT },
+    labels: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between' },
+    label: { fontSize: 11, color: colors.textSoft },
+  })
+}

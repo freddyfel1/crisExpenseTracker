@@ -18,7 +18,8 @@ import { v4 as uuidv4 } from 'uuid'
 import { getReceiptSignedUrl } from '../../src/data/api'
 import { useCategories, useDeleteTransaction, useSaveTransaction, useTransactions } from '../../src/hooks/useAppData'
 import type { Transaction } from '../../src/types'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 import { formatMoney, todayKey } from '../../src/utils/format'
 
 function emptyTransaction(): Transaction {
@@ -33,6 +34,8 @@ export default function TransactionDetail() {
   const categories = useCategories()
   const saveTransaction = useSaveTransaction()
   const deleteTransaction = useDeleteTransaction()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
 
   const existing = transactions.data?.find((t) => t.id === id)
   const [draft, setDraft] = useState<Transaction | null>(isNew ? emptyTransaction() : existing ?? null)
@@ -91,7 +94,7 @@ export default function TransactionDetail() {
       <ScrollView contentContainerStyle={styles.content}>
         {imageUrl && <Image source={{ uri: imageUrl }} style={styles.receipt} resizeMode="cover" />}
 
-        <Field label="Merchant">
+        <Field styles={styles} label="Merchant">
           <TextInput
             style={styles.input}
             value={draft.merchant}
@@ -99,9 +102,14 @@ export default function TransactionDetail() {
           />
         </Field>
 
-        <CurrencyField label="Price" value={draft.amount} onCommit={(v) => setDraft({ ...draft, amount: v })} />
+        <CurrencyField
+          styles={styles}
+          label="Price"
+          value={draft.amount}
+          onCommit={(v) => setDraft({ ...draft, amount: v })}
+        />
 
-        <Field label="Date">
+        <Field styles={styles} label="Date">
           <TextInput
             style={styles.input}
             value={draft.date.slice(0, 10)}
@@ -110,7 +118,7 @@ export default function TransactionDetail() {
           />
         </Field>
 
-        <Field label="Category">
+        <Field styles={styles} label="Category">
           <View style={styles.chipRow}>
             {(categories.data ?? []).map((c) => (
               <Pressable
@@ -128,7 +136,7 @@ export default function TransactionDetail() {
           </View>
         </Field>
 
-        <Field label="Notes">
+        <Field styles={styles} label="Notes">
           <TextInput
             style={[styles.input, { height: 72 }]}
             multiline
@@ -156,7 +164,15 @@ export default function TransactionDetail() {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  styles,
+  label,
+  children,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
@@ -170,10 +186,20 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // "12.5" becomes "125" since the "." never survives a re-render). Keeping the input's own
 // text as local state — synced back to the parent only on blur — lets the user type freely,
 // and shows a formatted dollar amount while not focused, matching the web app's Amount field.
-function CurrencyField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+function CurrencyField({
+  styles,
+  label,
+  value,
+  onCommit,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  value: number
+  onCommit: (v: number) => void
+}) {
   const [text, setText] = useState(formatMoney(value))
   return (
-    <Field label={label}>
+    <Field styles={styles} label={label}>
       <TextInput
         style={styles.input}
         keyboardType="decimal-pad"
@@ -191,7 +217,8 @@ function CurrencyField({ label, value, onCommit }: { label: string; value: numbe
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 48 },
   receipt: { width: '100%', height: 200, borderRadius: 12, marginBottom: 4 },
@@ -225,4 +252,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-})
+  })
+}

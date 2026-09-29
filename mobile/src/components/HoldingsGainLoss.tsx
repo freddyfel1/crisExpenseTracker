@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Holding } from '../data/selectors'
 import { formatMoney } from '../utils/format'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 
 interface HoldingRow extends Holding {
   priceNow: number
@@ -24,6 +25,8 @@ const CHART_HEIGHT = 160
 const HALF_HEIGHT = CHART_HEIGHT / 2
 
 export function HoldingsGainLoss({ holdings, prices }: Props) {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const [selected, setSelected] = useState(0)
 
   const rows: HoldingRow[] = holdings
@@ -112,10 +115,12 @@ export function HoldingsGainLoss({ holdings, prices }: Props) {
 
       <View style={styles.detailCard}>
         <Text style={styles.detailSymbol}>{selectedRow.symbol}</Text>
-        <DetailRow label="Qty" value={String(selectedRow.quantity)} />
-        <DetailRow label="Price now" value={formatMoney(selectedRow.priceNow)} />
-        <DetailRow label="Market value" value={formatMoney(selectedRow.value)} />
+        <DetailRow styles={styles} colors={colors} label="Qty" value={String(selectedRow.quantity)} />
+        <DetailRow styles={styles} colors={colors} label="Price now" value={formatMoney(selectedRow.priceNow)} />
+        <DetailRow styles={styles} colors={colors} label="Market value" value={formatMoney(selectedRow.value)} />
         <DetailRow
+          styles={styles}
+          colors={colors}
           label="Gain/loss"
           value={`${selectedRow.gain >= 0 ? '+' : ''}${formatMoney(selectedRow.gain)}${gainPct != null ? ` (${gainPct.toFixed(1)}%)` : ''}`}
           tone={selectedRow.gain >= 0 ? 'good' : 'warn'}
@@ -136,7 +141,19 @@ export function HoldingsGainLoss({ holdings, prices }: Props) {
   )
 }
 
-function DetailRow({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' }) {
+function DetailRow({
+  styles,
+  colors,
+  label,
+  value,
+  tone,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
+  label: string
+  value: string
+  tone?: 'good' | 'warn'
+}) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -149,7 +166,8 @@ function DetailRow({ label, value, tone }: { label: string; value: string; tone?
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   emptyBox: { paddingVertical: 24, alignItems: 'center' },
   emptyText: { fontSize: 12.5, color: colors.textSoft, textAlign: 'center' },
   chartArea: { flexDirection: 'row', height: CHART_HEIGHT },
@@ -188,4 +206,5 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendSwatch: { width: 9, height: 9, borderRadius: 5 },
   legendText: { fontSize: 11.5, color: colors.textSoft },
-})
+  })
+}

@@ -14,7 +14,8 @@ import {
 import { compareEarlyRepayment, debtLedger, projectAmortization } from '../data/selectors'
 import type { Debt, DebtPayment, DebtType } from '../types'
 import { formatMoney } from '../utils/format'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 
 const DEBT_TYPE_LABELS: Record<DebtType, string> = {
   mortgage: 'Mortgage',
@@ -43,6 +44,8 @@ export function DebtsScreen() {
   const saveDebtPayment = useSaveDebtPayment()
   const deleteDebtPayment = useDeleteDebtPayment()
   const router = useRouter()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
 
   const debtList = debts.data ?? []
   const paymentList = payments.data ?? []
@@ -115,10 +118,21 @@ export function DebtsScreen() {
 
         <View style={styles.card}>
           <View style={styles.summaryGrid}>
-            <SummaryStat label="Total debt" value={formatMoney(totalBalance)} />
-            <SummaryStat label="Monthly payments" value={formatMoney(totalMonthlyPayment)} />
-            <SummaryStat label="Debts" value={String(debtList.length)} />
-            <SummaryStat label="Paid off" value={`${paidOffPct.toFixed(0)}%`} tone="good" />
+            <SummaryStat styles={styles} colors={colors} label="Total debt" value={formatMoney(totalBalance)} />
+            <SummaryStat
+              styles={styles}
+              colors={colors}
+              label="Monthly payments"
+              value={formatMoney(totalMonthlyPayment)}
+            />
+            <SummaryStat styles={styles} colors={colors} label="Debts" value={String(debtList.length)} />
+            <SummaryStat
+              styles={styles}
+              colors={colors}
+              label="Paid off"
+              value={`${paidOffPct.toFixed(0)}%`}
+              tone="good"
+            />
           </View>
         </View>
 
@@ -130,6 +144,8 @@ export function DebtsScreen() {
           {debtList.map((debt) => (
             <DebtCard
               key={debt.id}
+              styles={styles}
+              colors={colors}
               debt={debt}
               payments={paymentList.filter((p) => p.debtId === debt.id)}
               onEdit={() => router.push(`/debt/${debt.id}`)}
@@ -154,7 +170,19 @@ export function DebtsScreen() {
   )
 }
 
-function SummaryStat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' }) {
+function SummaryStat({
+  styles,
+  colors,
+  label,
+  value,
+  tone,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
+  label: string
+  value: string
+  tone?: 'good' | 'warn'
+}) {
   return (
     <View style={styles.summaryStat}>
       <Text style={styles.summaryLabel}>{label}</Text>
@@ -172,6 +200,8 @@ function SummaryStat({ label, value, tone }: { label: string; value: string; ton
 }
 
 function DebtCard({
+  styles,
+  colors,
   debt,
   payments,
   onEdit,
@@ -180,6 +210,8 @@ function DebtCard({
   onEditPayment,
   onDeletePayment,
 }: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
   debt: Debt
   payments: DebtPayment[]
   onEdit: () => void
@@ -295,9 +327,21 @@ function DebtCard({
           />
 
           <View style={styles.summaryGrid}>
-            <SummaryStat label="Months saved" value={String(comparison.monthsSaved)} tone="good" />
-            <SummaryStat label="Interest saved" value={formatMoney(comparison.interestSaved)} tone="good" />
-            <SummaryStat label="Payoff date" value={comparison.newPayoffDate ?? '—'} />
+            <SummaryStat
+              styles={styles}
+              colors={colors}
+              label="Months saved"
+              value={String(comparison.monthsSaved)}
+              tone="good"
+            />
+            <SummaryStat
+              styles={styles}
+              colors={colors}
+              label="Interest saved"
+              value={formatMoney(comparison.interestSaved)}
+              tone="good"
+            />
+            <SummaryStat styles={styles} colors={colors} label="Payoff date" value={comparison.newPayoffDate ?? '—'} />
           </View>
 
           <Text style={styles.fieldLabel}>Schedule (next payments)</Text>
@@ -318,7 +362,8 @@ function DebtCard({
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
@@ -397,4 +442,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   addButtonText: { fontSize: 13, fontWeight: '600', color: colors.textSoft },
-})
+  })
+}

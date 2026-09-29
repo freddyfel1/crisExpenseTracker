@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 import { formatMoneyCompact } from '../utils/format'
 
 interface Props {
@@ -9,6 +10,8 @@ interface Props {
 const CHART_HEIGHT = 140
 
 export function IncomeExpenseTrendChart({ data }: Props) {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const max = Math.max(...data.flatMap((d) => [d.income, d.expense]), 1)
 
   return (
@@ -27,8 +30,8 @@ export function IncomeExpenseTrendChart({ data }: Props) {
         {data.map((d) => (
           <View key={d.label} style={styles.month}>
             <View style={styles.bars}>
-              <Bar value={d.income} max={max} color={colors.primary} />
-              <Bar value={d.expense} max={max} color={colors.warn} />
+              <Bar styles={styles} value={d.income} max={max} color={colors.primary} />
+              <Bar styles={styles} value={d.expense} max={max} color={colors.warn} />
             </View>
             <Text style={styles.monthLabel}>{d.label}</Text>
           </View>
@@ -38,7 +41,17 @@ export function IncomeExpenseTrendChart({ data }: Props) {
   )
 }
 
-function Bar({ value, max, color }: { value: number; max: number; color: string }) {
+function Bar({
+  styles,
+  value,
+  max,
+  color,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  value: number
+  max: number
+  color: string
+}) {
   const height = Math.max((value / max) * (CHART_HEIGHT - 20), value > 0 ? 2 : 0)
   return (
     <View style={styles.barSlot}>
@@ -52,7 +65,8 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { gap: 12 },
   legendRow: { flexDirection: 'row', gap: 16, justifyContent: 'center' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -65,4 +79,5 @@ const styles = StyleSheet.create({
   bar: { width: 10, borderRadius: 3 },
   barValue: { fontSize: 8, color: colors.textSoft, marginBottom: 2 },
   monthLabel: { fontSize: 10, color: colors.textSoft },
-})
+  })
+}

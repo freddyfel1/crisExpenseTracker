@@ -12,9 +12,12 @@ import {
 } from 'react-native'
 import { Wallet } from 'lucide-react-native'
 import { supabase } from '../lib/supabase'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 
 export function SignInScreen() {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in')
@@ -96,7 +99,8 @@ export function SignInScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { flex: 1, justifyContent: 'center', paddingHorizontal: 20 },
   card: {
@@ -141,4 +145,5 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   switchText: { textAlign: 'center', color: colors.textSoft, fontSize: 13, marginTop: 4 },
   error: { color: colors.warn, fontSize: 13 },
-})
+  })
+}

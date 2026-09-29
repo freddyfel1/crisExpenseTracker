@@ -15,7 +15,8 @@ import { budgetStatsForMonth, groupBudgetItemsBySection } from '../../src/data/s
 import { usePeriod } from '../../src/data/period'
 import type { BudgetLineItem, BudgetSection } from '../../src/types'
 import { formatMoney } from '../../src/utils/format'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 import { MonthPicker } from '../../src/components/MonthPicker'
 
 function confirmDelete(message: string, onConfirm: () => void) {
@@ -39,6 +40,8 @@ export default function BudgetPlannerScreen() {
   const deleteItem = useDeleteBudgetLineItem()
   const duplicateBudgetMonth = useDuplicateBudgetMonth()
   const { month } = usePeriod()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
 
   const allSections = sections.data ?? []
   const items = lineItems.data ?? []
@@ -92,11 +95,11 @@ export default function BudgetPlannerScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Summary</Text>
           <View style={styles.summaryGrid}>
-            <SummaryStat label="Income" value={income} />
-            <SummaryStat label="Expenses" value={expenses} />
-            <SummaryStat label="Difference" value={difference} warn={difference < 0} />
-            <SummaryStat label="Savings" value={savings} />
-            <SummaryStat label="Balance" value={balance} warn={balance < 0} />
+            <SummaryStat styles={styles} colors={colors} label="Income" value={income} />
+            <SummaryStat styles={styles} colors={colors} label="Expenses" value={expenses} />
+            <SummaryStat styles={styles} colors={colors} label="Difference" value={difference} warn={difference < 0} />
+            <SummaryStat styles={styles} colors={colors} label="Savings" value={savings} />
+            <SummaryStat styles={styles} colors={colors} label="Balance" value={balance} warn={balance < 0} />
           </View>
         </View>
 
@@ -105,6 +108,8 @@ export default function BudgetPlannerScreen() {
           return (
             <SectionBlock
               key={section.id}
+              styles={styles}
+              colors={colors}
               section={section}
               items={sectionItems}
               onAddItem={() =>
@@ -141,7 +146,19 @@ export default function BudgetPlannerScreen() {
   )
 }
 
-function SummaryStat({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
+function SummaryStat({
+  styles,
+  colors,
+  label,
+  value,
+  warn,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
+  label: string
+  value: number
+  warn?: boolean
+}) {
   return (
     <View style={styles.summaryStat}>
       <Text style={styles.summaryLabel}>{label}</Text>
@@ -151,6 +168,8 @@ function SummaryStat({ label, value, warn }: { label: string; value: number; war
 }
 
 function SectionBlock({
+  styles,
+  colors,
   section,
   items,
   onAddItem,
@@ -160,6 +179,8 @@ function SectionBlock({
   onRenameSection,
   onDeleteSection,
 }: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
   section: BudgetSection
   items: BudgetLineItem[]
   onAddItem: () => void
@@ -192,7 +213,14 @@ function SectionBlock({
 
       {items.length === 0 && <Text style={styles.statSub}>No line items yet.</Text>}
       {items.map((item) => (
-        <LineItemRow key={item.id} item={item} onSave={onSaveItem} onDelete={() => onDeleteItem(item.id)} />
+        <LineItemRow
+          key={item.id}
+          styles={styles}
+          colors={colors}
+          item={item}
+          onSave={onSaveItem}
+          onDelete={() => onDeleteItem(item.id)}
+        />
       ))}
 
       <Pressable style={styles.addItemButton} onPress={onAddItem} disabled={isAddingItem}>
@@ -204,10 +232,14 @@ function SectionBlock({
 }
 
 function LineItemRow({
+  styles,
+  colors,
   item,
   onSave,
   onDelete,
 }: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
   item: BudgetLineItem
   onSave: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) => void
   onDelete: () => void
@@ -268,7 +300,8 @@ function LineItemRow({
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
@@ -330,4 +363,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   addSectionText: { fontSize: 13, fontWeight: '600', color: colors.textSoft },
-})
+  })
+}

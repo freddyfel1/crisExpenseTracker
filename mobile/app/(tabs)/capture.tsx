@@ -8,12 +8,15 @@ import { v4 as uuidv4 } from 'uuid'
 import { parseReceipt, uploadReceiptPhoto } from '../../src/data/api'
 import { useSaveTransaction } from '../../src/hooks/useAppData'
 import { useSession } from '../../src/hooks/useSession'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 
 export default function Capture() {
   const { session } = useSession()
   const router = useRouter()
   const saveTransaction = useSaveTransaction()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const [preview, setPreview] = useState<string | null>(null)
   const [stage, setStage] = useState<'idle' | 'uploading' | 'reading'>('idle')
 
@@ -121,7 +124,8 @@ export default function Capture() {
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 12 },
   title: { fontSize: 22, fontWeight: '600', color: colors.ink, textAlign: 'center' },
@@ -150,4 +154,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryButtonText: { color: colors.text, fontWeight: '600', fontSize: 15 },
-})
+  })
+}

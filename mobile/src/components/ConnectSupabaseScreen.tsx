@@ -1,7 +1,10 @@
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 
 export function ConnectSupabaseScreen() {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -31,7 +34,8 @@ export function ConnectSupabaseScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 24, gap: 16 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
@@ -46,4 +50,5 @@ const styles = StyleSheet.create({
   },
   stepTitle: { fontSize: 14, fontWeight: '600', color: colors.ink },
   footnote: { fontSize: 12, color: colors.textSoft, marginTop: 8 },
-})
+  })
+}

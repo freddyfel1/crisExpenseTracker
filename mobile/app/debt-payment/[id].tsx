@@ -4,7 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Trash2 } from 'lucide-react-native'
 import { useDebtPayments, useDebts, useDeleteDebtPayment, useSaveDebtPayment } from '../../src/hooks/useAppData'
 import type { DebtPayment } from '../../src/types'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 import { formatMoney } from '../../src/utils/format'
 
 export default function DebtPaymentDetail() {
@@ -14,6 +15,8 @@ export default function DebtPaymentDetail() {
   const payments = useDebtPayments()
   const savePayment = useSaveDebtPayment()
   const deletePayment = useDeleteDebtPayment()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
 
   const existing = payments.data?.find((p) => p.id === id)
   const [draft, setDraft] = useState<DebtPayment | null>(existing ?? null)
@@ -61,7 +64,7 @@ export default function DebtPaymentDetail() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Field label="Debt">
+        <Field styles={styles} label="Debt">
           <View style={styles.chipRow}>
             {(debts.data ?? []).map((d) => (
               <Pressable
@@ -79,9 +82,14 @@ export default function DebtPaymentDetail() {
           </View>
         </Field>
 
-        <CurrencyField label="Amount" value={draft.amount} onCommit={(v) => setDraft({ ...draft, amount: v })} />
+        <CurrencyField
+          styles={styles}
+          label="Amount"
+          value={draft.amount}
+          onCommit={(v) => setDraft({ ...draft, amount: v })}
+        />
 
-        <Field label="Date">
+        <Field styles={styles} label="Date">
           <TextInput
             style={styles.input}
             value={draft.date.slice(0, 10)}
@@ -90,7 +98,7 @@ export default function DebtPaymentDetail() {
           />
         </Field>
 
-        <Field label="Notes">
+        <Field styles={styles} label="Notes">
           <TextInput
             style={[styles.input, { height: 72 }]}
             multiline
@@ -112,7 +120,15 @@ export default function DebtPaymentDetail() {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  styles,
+  label,
+  children,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
@@ -123,10 +139,20 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // Same "always clear on focus, empty text on blur means no change" pattern as
 // investment-transaction/[id].tsx's CurrencyField — see that file for the full rationale.
-function CurrencyField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+function CurrencyField({
+  styles,
+  label,
+  value,
+  onCommit,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  value: number
+  onCommit: (v: number) => void
+}) {
   const [text, setText] = useState(formatMoney(value))
   return (
-    <Field label={label}>
+    <Field styles={styles} label={label}>
       <TextInput
         style={styles.input}
         keyboardType="decimal-pad"
@@ -144,7 +170,8 @@ function CurrencyField({ label, value, onCommit }: { label: string; value: numbe
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 48 },
   label: { fontSize: 12, fontWeight: '600', color: colors.textSoft },
@@ -177,4 +204,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-})
+  })
+}
