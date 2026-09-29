@@ -259,15 +259,22 @@ export async function deleteBudgetLineItem(id: string) {
 }
 
 export async function fetchInvestmentAccounts(): Promise<InvestmentAccount[]> {
-  const { data, error } = await supabase.from('investment_accounts').select('*').order('name')
+  const { data, error } = await supabase.from('investment_accounts').select('*').order('sort_order')
   if (error) throw error
   return (
-    data as { id: string; name: string; institution: string | null; account_type: InvestmentAccount['accountType'] }[]
+    data as {
+      id: string
+      name: string
+      institution: string | null
+      account_type: InvestmentAccount['accountType']
+      sort_order: number
+    }[]
   ).map((a) => ({
     id: a.id,
     name: a.name,
     institution: a.institution,
     accountType: a.account_type,
+    sortOrder: a.sort_order,
   }))
 }
 
@@ -278,6 +285,7 @@ export async function upsertInvestmentAccount(userId: string, a: Partial<Investm
     name: a.name,
     institution: a.institution ?? null,
     account_type: a.accountType ?? 'brokerage',
+    sort_order: a.sortOrder ?? 0,
   })
   if (error) throw error
 }
@@ -362,7 +370,7 @@ export async function refreshInvestmentPrices(
 }
 
 export async function fetchDebts(): Promise<Debt[]> {
-  const { data, error } = await supabase.from('debts').select('*').order('name')
+  const { data, error } = await supabase.from('debts').select('*').order('sort_order')
   if (error) throw error
   return (
     data as {
@@ -376,6 +384,7 @@ export async function fetchDebts(): Promise<Debt[]> {
       monthly_payment: number
       start_date: string
       notes: string | null
+      sort_order: number
     }[]
   ).map((d) => ({
     id: d.id,
@@ -388,6 +397,7 @@ export async function fetchDebts(): Promise<Debt[]> {
     monthlyPayment: Number(d.monthly_payment),
     startDate: d.start_date,
     notes: d.notes,
+    sortOrder: d.sort_order,
   }))
 }
 
@@ -404,6 +414,7 @@ export async function upsertDebt(userId: string, d: Partial<Debt> & { id: string
     monthly_payment: d.monthlyPayment ?? 0,
     start_date: d.startDate,
     notes: d.notes ?? null,
+    sort_order: d.sortOrder ?? 0,
   })
   if (error) throw error
 }

@@ -83,6 +83,7 @@ export function DebtsScreen() {
         monthlyPayment: 0,
         startDate: new Date().toISOString().slice(0, 10),
         notes: '',
+        sortOrder: debtList.length,
       })
       router.push(`/debt/${id}`)
     } catch (err) {

@@ -72,6 +72,7 @@ export interface InvestmentAccount {
   name: string
   institution: string | null
   accountType: InvestmentAccountType
+  sortOrder: number
 }
 
 export type AssetType = 'etf' | 'stock' | 'crypto' | 'other'
@@ -103,6 +104,7 @@ export interface Debt {
   monthlyPayment: number
   startDate: string // YYYY-MM-DD
   notes: string | null
+  sortOrder: number
 }
 
 export interface DebtPayment {

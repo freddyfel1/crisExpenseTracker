@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, GripVertical, Plus, Search, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { usePeriod } from '../data/period'
+import { useDragReorder } from '../hooks/useDragReorder'
 import { budgetStatsForMonth, groupBudgetItemsBySection, monthsUpTo } from '../data/selectors'
 import { firstName, formatMoney, monthKeyLabel } from '../utils/format'
 import { Card } from '../components/Card'
@@ -246,27 +247,17 @@ export function BudgetPlanner() {
     (item.miscInfo ?? '').toLowerCase().includes(q) ||
     (item.remarks ?? '').toLowerCase().includes(q)
 
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dragOverId, setDragOverId] = useState<string | null>(null)
-
-  const moveSection = (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return
-    const ids = monthSections.map((s) => s.id)
-    const from = ids.indexOf(sourceId)
-    const to = ids.indexOf(targetId)
-    if (from === -1 || to === -1) return
-    const reordered = [...ids]
-    const [moved] = reordered.splice(from, 1)
-    reordered.splice(to, 0, moved)
-    reordered.forEach((id, index) => {
-      const section = monthSections.find((s) => s.id === id)
-      if (section && section.sortOrder !== index) {
-        addBudgetSection({ id: section.id, name: section.name, sortOrder: index, monthKey: section.monthKey })
-      }
+  const { displayItems: displaySections, isDragging, registerRef, handlePointerDown, handlePointerMove, handlePointerUp } =
+    useDragReorder(monthSections, (orderedIds) => {
+      orderedIds.forEach((id, index) => {
+        const section = monthSections.find((s) => s.id === id)
+        if (section && section.sortOrder !== index) {
+          addBudgetSection({ id: section.id, name: section.name, sortOrder: index, monthKey: section.monthKey })
+        }
+      })
     })
-  }
 
-  const visibleSections = monthSections
+  const visibleSections = displaySections
     .map((section) => {
       const items = (itemsBySection.get(section.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder)
       const visibleItems = q ? items.filter(matchesQuery) : items
@@ -352,19 +343,11 @@ export function BudgetPlanner() {
               deleteBudgetSection(section.id)
             }
           }}
-          isDragging={draggingId === section.id}
-          isDragOver={dragOverId === section.id && draggingId !== null && draggingId !== section.id}
-          onHandleDragStart={() => setDraggingId(section.id)}
-          onCardDragEnter={() => draggingId && setDragOverId(section.id)}
-          onCardDragEnd={() => {
-            setDraggingId(null)
-            setDragOverId(null)
-          }}
-          onCardDrop={() => {
-            if (draggingId) moveSection(draggingId, section.id)
-            setDraggingId(null)
-            setDragOverId(null)
-          }}
+          cardRef={registerRef(section.id)}
+          isDragging={isDragging(section.id)}
+          onGripPointerDown={handlePointerDown(section.id)}
+          onGripPointerMove={handlePointerMove}
+          onGripPointerUp={handlePointerUp}
         />
       ))}
 
@@ -451,12 +434,11 @@ function SectionCard({
   onSaveItem,
   onRenameSection,
   onDeleteSection,
+  cardRef,
   isDragging,
-  isDragOver,
-  onHandleDragStart,
-  onCardDragEnter,
-  onCardDragEnd,
-  onCardDrop,
+  onGripPointerDown,
+  onGripPointerMove,
+  onGripPointerUp,
 }: {
   section: BudgetSection
   items: BudgetLineItem[]
@@ -468,33 +450,22 @@ function SectionCard({
   onSaveItem: (item: Partial<BudgetLineItem> & { id?: string; sectionId: string }) => void
   onRenameSection: (name: string) => void
   onDeleteSection: () => void
+  cardRef: (el: HTMLElement | null) => void
   isDragging: boolean
-  isDragOver: boolean
-  onHandleDragStart: () => void
-  onCardDragEnter: () => void
-  onCardDragEnd: () => void
-  onCardDrop: () => void
+  onGripPointerDown: (e: React.PointerEvent<HTMLElement>) => void
+  onGripPointerMove: (e: React.PointerEvent<HTMLElement>) => void
+  onGripPointerUp: () => void
 }) {
   return (
-    <div
-      onDragOver={(e) => e.preventDefault()}
-      onDragEnter={onCardDragEnter}
-      onDrop={(e) => {
-        e.preventDefault()
-        onCardDrop()
-      }}
-      className={`rounded-xl transition-opacity ${isDragging ? 'opacity-40' : ''} ${
-        isDragOver ? 'ring-2 ring-[var(--primary)]' : ''
-      }`}
-    >
+    <div ref={cardRef} className={`rounded-xl transition-opacity ${isDragging ? 'opacity-40' : ''}`}>
       <Card>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex flex-1 items-center gap-2">
             <span
-              draggable
-              onDragStart={onHandleDragStart}
-              onDragEnd={onCardDragEnd}
-              className="cursor-grab text-[var(--text-soft)] hover:text-[var(--ink)] active:cursor-grabbing"
+              onPointerDown={onGripPointerDown}
+              onPointerMove={onGripPointerMove}
+              onPointerUp={onGripPointerUp}
+              className="touch-none cursor-grab text-[var(--text-soft)] hover:text-[var(--ink)] active:cursor-grabbing"
               title="Drag to reorder section"
             >
               <GripVertical size={15} />

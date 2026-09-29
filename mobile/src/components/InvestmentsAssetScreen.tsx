@@ -179,7 +179,13 @@ export function InvestmentsAssetScreen({
   const addAccount = async () => {
     const id = uuidv4()
     try {
-      await saveAccount.mutateAsync({ id, name: 'New account', institution: '', accountType: newAccountType })
+      await saveAccount.mutateAsync({
+        id,
+        name: 'New account',
+        institution: '',
+        accountType: newAccountType,
+        sortOrder: accountList.length,
+      })
       router.push(`/investment-account/${id}`)
     } catch (err) {
       Alert.alert('Could not add account', err instanceof Error ? err.message : 'Unknown error')
