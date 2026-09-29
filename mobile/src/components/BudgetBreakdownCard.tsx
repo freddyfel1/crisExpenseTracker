@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native'
 import type { SectionBudget } from '../data/selectors'
 import { formatMoney } from '../utils/format'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 import { Donut } from './Donut'
 
 // Budget sections have no color of their own (unlike categories), so this chart cycles
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export function BudgetBreakdownCard({ data }: Props) {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const top = data.slice(0, 6)
   const total = data.reduce((s, d) => s + d.total, 0)
 
@@ -51,7 +54,8 @@ export function BudgetBreakdownCard({ data }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { gap: 16, alignItems: 'center' },
   empty: { minHeight: 120, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 13, color: colors.textSoft, textAlign: 'center' },
@@ -61,4 +65,5 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 13, color: colors.text },
   rowPct: { fontSize: 12, color: colors.textSoft, fontVariant: ['tabular-nums'] },
   rowAmount: { fontSize: 13, fontWeight: '600', color: colors.ink, width: 76, textAlign: 'right', fontVariant: ['tabular-nums'] },
-})
+  })
+}

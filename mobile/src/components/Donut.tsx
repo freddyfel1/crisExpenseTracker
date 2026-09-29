@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, G } from 'react-native-svg'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 
 export interface DonutSegment {
   key: string
@@ -21,6 +22,8 @@ interface Props {
 // recharts donut. Kept to react-native-svg (already an Expo Go-bundled module) rather than
 // pulling in a charting library, since Expo Go can only run natively-bundled modules.
 export function Donut({ segments, size = 168, strokeWidth = 24, centerLabel, centerSubLabel }: Props) {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
   const total = segments.reduce((s, d) => s + d.value, 0)
@@ -74,8 +77,10 @@ export function Donut({ segments, size = 168, strokeWidth = 24, centerLabel, cen
   )
 }
 
-const styles = StyleSheet.create({
-  centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  centerLabel: { fontSize: 17, fontWeight: '600', color: colors.ink },
-  centerSubLabel: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: colors.textSoft, marginTop: 2 },
-})
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+    centerLabel: { fontSize: 17, fontWeight: '600', color: colors.ink },
+    centerSubLabel: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: colors.textSoft, marginTop: 2 },
+  })
+}

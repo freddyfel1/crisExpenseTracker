@@ -8,7 +8,8 @@ import {
   useSaveInvestmentTransaction,
 } from '../../src/hooks/useAppData'
 import type { AssetType, InvestmentTransaction, InvestmentTransactionType } from '../../src/types'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 import { formatMoney } from '../../src/utils/format'
 
 const ASSET_TYPES: { value: AssetType; label: string }[] = [
@@ -31,6 +32,8 @@ export default function InvestmentTransactionDetail() {
   const transactions = useInvestmentTransactions()
   const saveTransaction = useSaveInvestmentTransaction()
   const deleteTransaction = useDeleteInvestmentTransaction()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
 
   const existing = transactions.data?.find((t) => t.id === id)
   const [draft, setDraft] = useState<InvestmentTransaction | null>(existing ?? null)
@@ -79,7 +82,7 @@ export default function InvestmentTransactionDetail() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Field label="Symbol">
+        <Field styles={styles} label="Symbol">
           <TextInput
             style={styles.input}
             value={draft.symbol}
@@ -89,7 +92,7 @@ export default function InvestmentTransactionDetail() {
           />
         </Field>
 
-        <Field label="Asset type">
+        <Field styles={styles} label="Asset type">
           <View style={styles.chipRow}>
             {ASSET_TYPES.map(({ value, label }) => (
               <Pressable
@@ -107,7 +110,7 @@ export default function InvestmentTransactionDetail() {
           </View>
         </Field>
 
-        <Field label="Transaction">
+        <Field styles={styles} label="Transaction">
           <View style={styles.chipRow}>
             {TRANSACTION_TYPES.map(({ value, label }) => (
               <Pressable
@@ -126,20 +129,27 @@ export default function InvestmentTransactionDetail() {
         </Field>
 
         <NumberField
+          styles={styles}
           label="Quantity"
           value={draft.quantity}
           onCommit={(v) => setDraft({ ...draft, quantity: v })}
         />
 
         <CurrencyField
+          styles={styles}
           label="Price per unit"
           value={draft.pricePerUnit}
           onCommit={(v) => setDraft({ ...draft, pricePerUnit: v })}
         />
 
-        <CurrencyField label="Fees" value={draft.fees} onCommit={(v) => setDraft({ ...draft, fees: v })} />
+        <CurrencyField
+          styles={styles}
+          label="Fees"
+          value={draft.fees}
+          onCommit={(v) => setDraft({ ...draft, fees: v })}
+        />
 
-        <Field label="Date">
+        <Field styles={styles} label="Date">
           <TextInput
             style={styles.input}
             value={draft.date.slice(0, 10)}
@@ -148,7 +158,7 @@ export default function InvestmentTransactionDetail() {
           />
         </Field>
 
-        <Field label="Notes">
+        <Field styles={styles} label="Notes">
           <TextInput
             style={[styles.input, { height: 72 }]}
             multiline
@@ -174,7 +184,15 @@ export default function InvestmentTransactionDetail() {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  styles,
+  label,
+  children,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
@@ -192,10 +210,20 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // first. Tapping out without typing anything leaves the value unchanged rather than saving
 // an emptied field as 0 (Number('') is 0, not NaN — that footgun bit a few web number
 // fields earlier; same guard here).
-function NumberField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+function NumberField({
+  styles,
+  label,
+  value,
+  onCommit,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  value: number
+  onCommit: (v: number) => void
+}) {
   const [text, setText] = useState(String(value))
   return (
-    <Field label={label}>
+    <Field styles={styles} label={label}>
       <TextInput
         style={styles.input}
         keyboardType="decimal-pad"
@@ -215,10 +243,20 @@ function NumberField({ label, value, onCommit }: { label: string; value: number;
 
 // Same fix as NumberField, plus shows a formatted dollar amount while not focused (matching
 // the web app's Amount field) instead of a bare number.
-function CurrencyField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+function CurrencyField({
+  styles,
+  label,
+  value,
+  onCommit,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  value: number
+  onCommit: (v: number) => void
+}) {
   const [text, setText] = useState(formatMoney(value))
   return (
-    <Field label={label}>
+    <Field styles={styles} label={label}>
       <TextInput
         style={styles.input}
         keyboardType="decimal-pad"
@@ -236,7 +274,8 @@ function CurrencyField({ label, value, onCommit }: { label: string; value: numbe
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 48 },
   label: { fontSize: 12, fontWeight: '600', color: colors.textSoft },
@@ -269,4 +308,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-})
+  })
+}

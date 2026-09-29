@@ -22,9 +22,11 @@ import {
   transactionsForMonth,
 } from '../../src/data/selectors'
 import { usePeriod } from '../../src/data/period'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 import { formatMoney, monthKeyLabel } from '../../src/utils/format'
-import { colors } from '../../src/theme'
 import { MonthPicker } from '../../src/components/MonthPicker'
+import { ThemeToggle } from '../../src/components/ThemeToggle'
 import { CategoryBreakdownCard } from '../../src/components/CategoryBreakdownCard'
 import { BudgetBreakdownCard } from '../../src/components/BudgetBreakdownCard'
 import { SpendTrendChart } from '../../src/components/SpendTrendChart'
@@ -40,6 +42,8 @@ export default function Home() {
   const saveMonthlyIncome = useSaveMonthlyIncome()
   const queryClient = useQueryClient()
   const { month } = usePeriod()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const [refreshing, setRefreshing] = useState(false)
 
   const onRefresh = useCallback(async () => {
@@ -88,30 +92,40 @@ export default function Home() {
           {firstName ? <Text style={styles.titleWelcome}> — Welcome, {firstName}</Text> : null}
         </Text>
         <Text style={styles.subtitle}>Your financial position for {monthKeyLabel(month)}</Text>
+        <ThemeToggle />
         <MonthPicker />
 
         <View style={styles.statGrid}>
           <EditableStat
+            styles={styles}
             label="INCOME"
             value={monthlyIncome}
             sub="tap to edit"
             onSave={(v) => saveMonthlyIncome.mutate({ monthKey: month, monthlyIncome: v })}
           />
           <EditableStat
+            styles={styles}
             label="OTHER INCOME"
             value={otherIncome}
             sub="tap to edit"
             onSave={(v) => saveMonthlyIncome.mutate({ monthKey: month, otherIncome: v })}
           />
-          <Stat label="TOTAL INCOME" value={formatMoney(income)} sub="income + other income" />
-          <Stat label="TOTAL EXPENSE" value={formatMoney(spent)} sub={`${monthTxns.length} transactions`} />
+          <Stat styles={styles} label="TOTAL INCOME" value={formatMoney(income)} sub="income + other income" />
           <Stat
+            styles={styles}
+            label="TOTAL EXPENSE"
+            value={formatMoney(spent)}
+            sub={`${monthTxns.length} transactions`}
+          />
+          <Stat
+            styles={styles}
             label="DIFFERENCE"
             value={formatMoney(difference)}
             sub="income minus expense"
             color={difference < 0 ? colors.warn : colors.primary}
           />
           <Stat
+            styles={styles}
             label="6-MONTH TREND"
             value={formatMoney(trend[trend.length - 1]?.total ?? 0)}
             sub="this month vs. prior months"
@@ -158,7 +172,19 @@ export default function Home() {
   )
 }
 
-function Stat({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+function Stat({
+  styles,
+  label,
+  value,
+  sub,
+  color,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  value: string
+  sub?: string
+  color?: string
+}) {
   return (
     <View style={styles.statCard}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -175,11 +201,13 @@ function Stat({ label, value, sub, color }: { label: string; value: string; sub?
 }
 
 function EditableStat({
+  styles,
   label,
   value,
   sub,
   onSave,
 }: {
+  styles: ReturnType<typeof makeStyles>
   label: string
   value: number
   sub?: string
@@ -227,7 +255,8 @@ function EditableStat({
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '600', color: colors.ink },
@@ -271,4 +300,5 @@ const styles = StyleSheet.create({
   budgetSummaryText: { fontSize: 13, color: colors.textSoft },
   budgetSummaryMono: { color: colors.ink, fontWeight: '600' },
   budgetSummaryVerdict: { fontSize: 13, fontWeight: '600' },
-})
+  })
+}

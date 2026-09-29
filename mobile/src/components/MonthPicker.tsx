@@ -2,7 +2,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { ChevronLeft, ChevronRight } from 'lucide-react-native'
 import { usePeriod } from '../data/period'
 import { monthKeyLabel } from '../utils/format'
-import { colors } from '../theme'
+import { useTheme } from '../data/theme'
+import type { ThemeColors } from '../theme'
 
 // Mirrors web/src/components/MonthPicker.tsx.
 function shiftMonth(key: string, delta: number): string {
@@ -13,6 +14,8 @@ function shiftMonth(key: string, delta: number): string {
 
 export function MonthPicker() {
   const { month, setMonth } = usePeriod()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   return (
     <View style={styles.row}>
       <Pressable onPress={() => setMonth(shiftMonth(month, -1))} hitSlop={8} style={styles.button}>
@@ -26,7 +29,8 @@ export function MonthPicker() {
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -41,4 +45,5 @@ const styles = StyleSheet.create({
   },
   button: { padding: 6 },
   label: { minWidth: 108, textAlign: 'center', fontSize: 13, fontWeight: '600', color: colors.ink },
-})
+  })
+}

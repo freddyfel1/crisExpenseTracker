@@ -7,6 +7,7 @@ import { SignInScreen } from '../src/components/SignInScreen'
 import { isSupabaseConfigured } from '../src/lib/supabase'
 import { useSession } from '../src/hooks/useSession'
 import { PeriodProvider } from '../src/data/period'
+import { ThemeProvider, useTheme } from '../src/data/theme'
 
 const queryClient = new QueryClient()
 
@@ -36,13 +37,20 @@ function Gate() {
   )
 }
 
+function ThemedStatusBar() {
+  const { resolvedTheme } = useTheme()
+  return <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
+}
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style="dark" />
-        <Gate />
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemedStatusBar />
+          <Gate />
+        </QueryClientProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   )
 }

@@ -1,8 +1,9 @@
 import { Tabs } from 'expo-router'
 import { Camera, CreditCard, FileSpreadsheet, LayoutDashboard, Receipt, Settings as SettingsIcon, TrendingUp } from 'lucide-react-native'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
 
 export default function TabsLayout() {
+  const { colors } = useTheme()
   return (
     <Tabs
       screenOptions={{

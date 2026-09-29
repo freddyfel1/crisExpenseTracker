@@ -7,7 +7,8 @@ import { incomeForMonth, transactionsForMonth, totalSpend } from '../../src/data
 import { usePeriod } from '../../src/data/period'
 import type { Transaction } from '../../src/types'
 import { formatDate, formatMoney } from '../../src/utils/format'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/data/theme'
+import type { ThemeColors } from '../../src/theme'
 import { CategoryIcon } from '../../src/components/CategoryIcon'
 import { MonthPicker } from '../../src/components/MonthPicker'
 
@@ -17,6 +18,8 @@ export default function Transactions() {
   const monthlyIncomes = useMonthlyIncomes()
   const router = useRouter()
   const { month } = usePeriod()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'uncategorized' | string>('all')
 
@@ -114,8 +117,16 @@ export default function Transactions() {
             <MonthPicker />
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              <FilterChip label="All" active={categoryFilter === 'all'} onPress={() => setCategoryFilter('all')} />
               <FilterChip
+                styles={styles}
+                colors={colors}
+                label="All"
+                active={categoryFilter === 'all'}
+                onPress={() => setCategoryFilter('all')}
+              />
+              <FilterChip
+                styles={styles}
+                colors={colors}
                 label="Uncategorized"
                 active={categoryFilter === 'uncategorized'}
                 onPress={() => setCategoryFilter('uncategorized')}
@@ -123,6 +134,8 @@ export default function Transactions() {
               {(categories.data ?? []).map((c) => (
                 <FilterChip
                   key={c.id}
+                  styles={styles}
+                  colors={colors}
                   label={c.name}
                   color={c.color}
                   active={categoryFilter === c.id}
@@ -132,9 +145,14 @@ export default function Transactions() {
             </ScrollView>
 
             <View style={styles.statRow}>
-              <Stat label="INCOME" value={formatMoney(income)} />
-              <Stat label="EXPENSE" value={formatMoney(expense)} />
-              <Stat label="BALANCE" value={formatMoney(balance)} color={balance < 0 ? colors.warn : colors.primary} />
+              <Stat styles={styles} label="INCOME" value={formatMoney(income)} />
+              <Stat styles={styles} label="EXPENSE" value={formatMoney(expense)} />
+              <Stat
+                styles={styles}
+                label="BALANCE"
+                value={formatMoney(balance)}
+                color={balance < 0 ? colors.warn : colors.primary}
+              />
             </View>
           </View>
         }
@@ -144,11 +162,15 @@ export default function Transactions() {
 }
 
 function FilterChip({
+  styles,
+  colors,
   label,
   active,
   color,
   onPress,
 }: {
+  styles: ReturnType<typeof makeStyles>
+  colors: ThemeColors
   label: string
   active: boolean
   color?: string
@@ -167,7 +189,17 @@ function FilterChip({
   )
 }
 
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+function Stat({
+  styles,
+  label,
+  value,
+  color,
+}: {
+  styles: ReturnType<typeof makeStyles>
+  label: string
+  value: string
+  color?: string
+}) {
   return (
     <View style={styles.statCard}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -178,7 +210,8 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
   )
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 10 },
   titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
@@ -250,4 +283,5 @@ const styles = StyleSheet.create({
   amount: { fontSize: 14, fontWeight: '600', color: colors.ink, marginLeft: 8, maxWidth: 100 },
   separator: { height: 1, backgroundColor: colors.borderSoft, marginLeft: 20 },
   empty: { textAlign: 'center', color: colors.textSoft, marginTop: 60, paddingHorizontal: 32 },
-})
+  })
+}
