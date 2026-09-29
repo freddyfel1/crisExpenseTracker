@@ -159,6 +159,7 @@ export function useStore() {
   const saveBudgetSection = useMutation({
     mutationFn: (s: Partial<BudgetSection> & { id?: string }) => upsertBudgetSection(userId!, s),
     onSuccess: () => invalidate('budgetSections'),
+    onError: (err) => window.alert(err instanceof Error ? err.message : 'Could not save section.'),
   })
   const removeBudgetSection = useMutation({
     mutationFn: (id: string) => apiDeleteBudgetSection(id),
@@ -192,6 +193,7 @@ export function useStore() {
   const saveInvestmentAccount = useMutation({
     mutationFn: (a: Partial<InvestmentAccount> & { id?: string }) => upsertInvestmentAccount(userId!, a),
     onSuccess: () => invalidate('investmentAccounts'),
+    onError: (err) => window.alert(err instanceof Error ? err.message : 'Could not save account.'),
   })
   const removeInvestmentAccount = useMutation({
     mutationFn: (id: string) => apiDeleteInvestmentAccount(id),
@@ -216,6 +218,7 @@ export function useStore() {
   const saveDebt = useMutation({
     mutationFn: (d: Partial<Debt> & { id?: string }) => upsertDebt(userId!, d),
     onSuccess: () => invalidate('debts'),
+    onError: (err) => window.alert(err instanceof Error ? err.message : 'Could not save debt.'),
   })
   const removeDebt = useMutation({
     mutationFn: (id: string) => apiDeleteDebt(id),
