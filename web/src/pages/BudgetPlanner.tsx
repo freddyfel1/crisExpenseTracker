@@ -247,7 +247,7 @@ export function BudgetPlanner() {
     (item.miscInfo ?? '').toLowerCase().includes(q) ||
     (item.remarks ?? '').toLowerCase().includes(q)
 
-  const { displayItems: displaySections, isDragging, registerRef, handlePointerDown, handlePointerMove, handlePointerUp } =
+  const { displayItems: displaySections, isDragging, registerRef, handlePointerDown } =
     useDragReorder(monthSections, (orderedIds) => {
       orderedIds.forEach((id, index) => {
         const section = monthSections.find((s) => s.id === id)
@@ -346,8 +346,6 @@ export function BudgetPlanner() {
           cardRef={registerRef(section.id)}
           isDragging={isDragging(section.id)}
           onGripPointerDown={handlePointerDown(section.id)}
-          onGripPointerMove={handlePointerMove}
-          onGripPointerUp={handlePointerUp}
         />
       ))}
 
@@ -437,8 +435,6 @@ function SectionCard({
   cardRef,
   isDragging,
   onGripPointerDown,
-  onGripPointerMove,
-  onGripPointerUp,
 }: {
   section: BudgetSection
   items: BudgetLineItem[]
@@ -453,8 +449,6 @@ function SectionCard({
   cardRef: (el: HTMLElement | null) => void
   isDragging: boolean
   onGripPointerDown: (e: React.PointerEvent<HTMLElement>) => void
-  onGripPointerMove: (e: React.PointerEvent<HTMLElement>) => void
-  onGripPointerUp: () => void
 }) {
   return (
     <div ref={cardRef} className={`rounded-xl transition-opacity ${isDragging ? 'opacity-40' : ''}`}>
@@ -463,8 +457,6 @@ function SectionCard({
           <div className="flex flex-1 items-center gap-2">
             <span
               onPointerDown={onGripPointerDown}
-              onPointerMove={onGripPointerMove}
-              onPointerUp={onGripPointerUp}
               className="touch-none cursor-grab text-[var(--text-soft)] hover:text-[var(--ink)] active:cursor-grabbing"
               title="Drag to reorder section"
             >

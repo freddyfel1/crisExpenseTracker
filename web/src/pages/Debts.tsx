@@ -129,8 +129,6 @@ export function Debts() {
     isDragging,
     registerRef,
     handlePointerDown,
-    handlePointerMove,
-    handlePointerUp,
   } = useDragReorder(debts, (orderedIds) => {
     orderedIds.forEach((id, index) => {
       const debt = debts.find((d) => d.id === id)
@@ -201,8 +199,6 @@ export function Debts() {
             cardRef={registerRef(debt.id)}
             isDragging={isDragging(debt.id)}
             onGripPointerDown={handlePointerDown(debt.id)}
-            onGripPointerMove={handlePointerMove}
-            onGripPointerUp={handlePointerUp}
           />
         ))}
       </div>
@@ -240,8 +236,6 @@ function DebtCard({
   cardRef,
   isDragging,
   onGripPointerDown,
-  onGripPointerMove,
-  onGripPointerUp,
 }: {
   debt: Debt
   payments: DebtPayment[]
@@ -253,8 +247,6 @@ function DebtCard({
   cardRef: (el: HTMLElement | null) => void
   isDragging: boolean
   onGripPointerDown: (e: React.PointerEvent<HTMLElement>) => void
-  onGripPointerMove: (e: React.PointerEvent<HTMLElement>) => void
-  onGripPointerUp: () => void
 }) {
   const [showSchedule, setShowSchedule] = useState(false)
   const [extraPayment, setExtraPayment] = useState(0)
@@ -291,8 +283,6 @@ function DebtCard({
         <div className="flex items-start gap-3">
           <span
             onPointerDown={onGripPointerDown}
-            onPointerMove={onGripPointerMove}
-            onPointerUp={onGripPointerUp}
             className="mt-1.5 touch-none cursor-grab text-[var(--text-soft)] hover:text-[var(--ink)] active:cursor-grabbing"
             title="Drag to reorder debt"
           >
