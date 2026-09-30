@@ -6,10 +6,11 @@ import { useDragReorder } from '../hooks/useDragReorder'
 import { holdingsForAccount, marketValue, mergeHoldingsBySymbol, totalInvested } from '../data/selectors'
 import { syncPlaidInvestments } from '../data/api'
 import { useSession } from '../hooks/useSession'
-import { firstName, formatDate, formatMoney, formatRelativeTime } from '../utils/format'
+import { firstName, formatDate, formatMoney, formatRelativeTime, formatUnitPrice } from '../utils/format'
 import { StatCard } from '../components/StatCard'
 import { Card } from '../components/Card'
 import { HoldingsGainLoss } from '../components/HoldingsGainLoss'
+import { ClearableNumberInput } from '../components/ClearableNumberInput'
 import type { AssetType, InvestmentAccount, InvestmentAccountType, InvestmentTransaction, InvestmentTransactionType } from '../types'
 
 const ACCOUNT_TYPE_LABELS: Record<InvestmentAccountType, string> = {
@@ -241,9 +242,9 @@ export function InvestmentsAssetPage({
               return [
                 h.symbol,
                 String(h.quantity),
-                formatMoney(h.avgCost),
+                formatUnitPrice(h.avgCost),
                 formatMoney(h.costBasis),
-                priceNow != null ? formatMoney(priceNow) : '—',
+                priceNow != null ? formatUnitPrice(priceNow) : '—',
                 value != null ? formatMoney(value) : '—',
                 gain != null ? `${gain >= 0 ? '+' : ''}${formatMoney(gain)}` : '—',
               ]
@@ -567,23 +568,17 @@ export function InvestmentsAssetPage({
             <div className="mb-4 grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Quantity</span>
-                <input
-                  type="number"
-                  step="any"
+                <ClearableNumberInput
                   value={editingTransaction.quantity ?? 0}
-                  onChange={(e) => setEditingTransaction({ ...editingTransaction, quantity: Number(e.target.value) })}
+                  onCommit={(quantity) => setEditingTransaction({ ...editingTransaction, quantity })}
                   className="input font-mono"
                 />
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Price / unit</span>
-                <input
-                  type="number"
-                  step="any"
+                <ClearableNumberInput
                   value={editingTransaction.pricePerUnit ?? 0}
-                  onChange={(e) =>
-                    setEditingTransaction({ ...editingTransaction, pricePerUnit: Number(e.target.value) })
-                  }
+                  onCommit={(pricePerUnit) => setEditingTransaction({ ...editingTransaction, pricePerUnit })}
                   className="input font-mono"
                 />
               </label>
@@ -592,11 +587,9 @@ export function InvestmentsAssetPage({
             <div className="mb-4 grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Fees</span>
-                <input
-                  type="number"
-                  step="any"
+                <ClearableNumberInput
                   value={editingTransaction.fees ?? 0}
-                  onChange={(e) => setEditingTransaction({ ...editingTransaction, fees: Number(e.target.value) })}
+                  onCommit={(fees) => setEditingTransaction({ ...editingTransaction, fees })}
                   className="input font-mono"
                 />
               </label>
@@ -741,10 +734,10 @@ function AccountCard({
                     <tr key={h.symbol} className="border-b border-[var(--border-soft)] last:border-0">
                       <td className="px-3 py-2 font-medium text-[var(--ink)]">{h.symbol}</td>
                       <td className="px-3 py-2 text-right font-mono">{h.quantity}</td>
-                      <td className="px-3 py-2 text-right font-mono">{formatMoney(h.avgCost)}</td>
+                      <td className="px-3 py-2 text-right font-mono">{formatUnitPrice(h.avgCost)}</td>
                       <td className="px-3 py-2 text-right font-mono">{formatMoney(h.costBasis)}</td>
                       <td className="px-3 py-2 text-right font-mono">
-                        {priceNow != null ? formatMoney(priceNow) : '—'}
+                        {priceNow != null ? formatUnitPrice(priceNow) : '—'}
                       </td>
                       <td className="px-3 py-2 text-right font-mono">{value != null ? formatMoney(value) : '—'}</td>
                       <td
@@ -801,10 +794,10 @@ function AccountCard({
                   <td className="px-3 py-2 font-medium text-[var(--ink)]">{t.symbol}</td>
                   <td className="px-3 py-2 text-[var(--text-soft)]">{ASSET_TYPE_LABELS[t.assetType]}</td>
                   <td className="px-3 py-2 text-right font-mono">{t.quantity}</td>
-                  <td className="px-3 py-2 text-right font-mono">{formatMoney(t.pricePerUnit)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{formatUnitPrice(t.pricePerUnit)}</td>
                   <td className="px-3 py-2 text-[var(--text-soft)]">{formatDate(t.date)}</td>
                   <td className="px-3 py-2 text-right font-mono">
-                    {prices[t.symbol] != null ? formatMoney(prices[t.symbol]) : '—'}
+                    {prices[t.symbol] != null ? formatUnitPrice(prices[t.symbol]) : '—'}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button
