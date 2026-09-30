@@ -683,3 +683,26 @@ export async function refreshInvestmentPrices(
   if (error) throw error
   return data
 }
+
+// A manual correction for a symbol that resolves to the wrong coin/stock via the shared
+// investment_prices cache — e.g. a crypto ticker shared by two unrelated coins. Always wins
+// over the cache for that symbol; see the investment_price_overrides migration.
+export async function fetchInvestmentPriceOverrides(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from('investment_price_overrides').select('symbol, price')
+  if (error) throw error
+  const overrides: Record<string, number> = {}
+  for (const row of data as { symbol: string; price: number }[]) overrides[row.symbol] = Number(row.price)
+  return overrides
+}
+
+export async function saveInvestmentPriceOverride(userId: string, symbol: string, price: number): Promise<void> {
+  const { error } = await supabase
+    .from('investment_price_overrides')
+    .upsert({ user_id: userId, symbol, price, updated_at: new Date().toISOString() }, { onConflict: 'user_id,symbol' })
+  if (error) throw error
+}
+
+export async function deleteInvestmentPriceOverride(symbol: string): Promise<void> {
+  const { error } = await supabase.from('investment_price_overrides').delete().eq('symbol', symbol)
+  if (error) throw error
+}
