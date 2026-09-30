@@ -6,6 +6,7 @@ import {
   deleteDebt as apiDeleteDebt,
   deleteDebtPayment as apiDeleteDebtPayment,
   deleteInvestmentAccount as apiDeleteInvestmentAccount,
+  deleteInvestmentPriceOverride,
   deleteInvestmentTransaction as apiDeleteInvestmentTransaction,
   deleteSavingsGoal as apiDeleteSavingsGoal,
   deleteTransaction as apiDeleteTransaction,
@@ -16,6 +17,7 @@ import {
   fetchDebtPayments,
   fetchDebts,
   fetchInvestmentAccounts,
+  fetchInvestmentPriceOverrides,
   fetchInvestmentPrices,
   fetchInvestmentsLastSynced,
   fetchInvestmentTransactions,
@@ -25,6 +27,7 @@ import {
   fetchTransactions,
   importTransactions,
   refreshInvestmentPrices,
+  saveInvestmentPriceOverride,
   updateProfile,
   upsertBudgetLineItem,
   upsertBudgetSection,
@@ -117,6 +120,11 @@ export function useStore() {
   const investmentsLastSyncedQuery = useQuery({
     queryKey: ['investmentsLastSynced', userId],
     queryFn: fetchInvestmentsLastSynced,
+    enabled: Boolean(userId),
+  })
+  const investmentPriceOverridesQuery = useQuery({
+    queryKey: ['investmentPriceOverrides', userId],
+    queryFn: fetchInvestmentPriceOverrides,
     enabled: Boolean(userId),
   })
   const debtsQuery = useQuery({
@@ -215,6 +223,16 @@ export function useStore() {
     mutationFn: (symbols: { symbol: string; assetType: AssetType }[]) => refreshInvestmentPrices(symbols),
     onSuccess: () => invalidate('investmentPrices'),
   })
+  const savePriceOverride = useMutation({
+    mutationFn: ({ symbol, price }: { symbol: string; price: number }) =>
+      saveInvestmentPriceOverride(userId!, symbol, price),
+    onSuccess: () => invalidate('investmentPriceOverrides'),
+    onError: (err) => window.alert(err instanceof Error ? err.message : 'Could not save price override.'),
+  })
+  const removePriceOverride = useMutation({
+    mutationFn: (symbol: string) => deleteInvestmentPriceOverride(symbol),
+    onSuccess: () => invalidate('investmentPriceOverrides'),
+  })
   const saveDebt = useMutation({
     mutationFn: (d: Partial<Debt> & { id?: string }) => upsertDebt(userId!, d),
     onSuccess: () => invalidate('debts'),
@@ -258,6 +276,7 @@ export function useStore() {
     investmentAccounts: investmentAccountsQuery.data ?? ([] as InvestmentAccount[]),
     investmentTransactions: investmentTransactionsQuery.data ?? ([] as InvestmentTransaction[]),
     investmentPrices: investmentPricesQuery.data ?? ({} as Record<string, number>),
+    investmentPriceOverrides: investmentPriceOverridesQuery.data ?? ({} as Record<string, number>),
     investmentsLastSynced: investmentsLastSyncedQuery.data ?? null,
     debts: debtsQuery.data ?? ([] as Debt[]),
     debtPayments: debtPaymentsQuery.data ?? ([] as DebtPayment[]),
@@ -307,6 +326,8 @@ export function useStore() {
     refreshInvestmentPrices: (symbols: { symbol: string; assetType: AssetType }[]) =>
       refreshPrices.mutateAsync(symbols),
     isRefreshingPrices: refreshPrices.isPending,
+    saveInvestmentPriceOverride: (symbol: string, price: number) => savePriceOverride.mutate({ symbol, price }),
+    deleteInvestmentPriceOverride: (symbol: string) => removePriceOverride.mutate(symbol),
 
     saveDebt: (d: Partial<Debt> & { id?: string }) => saveDebt.mutate(d),
     deleteDebt: (id: string) => removeDebt.mutate(id),

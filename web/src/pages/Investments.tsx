@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { DollarSign, FileText, GripVertical, Landmark, Layers, Pencil, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
+import { DollarSign, FileText, GripVertical, Landmark, Layers, Pencil, Pin, PinOff, Plus, RefreshCw, TrendingUp, Trash2 } from 'lucide-react'
 import { useStore } from '../data/store'
 import { useDragReorder } from '../hooks/useDragReorder'
 import { holdingsForAccount, marketValue, totalInvested } from '../data/selectors'
@@ -58,6 +58,7 @@ export function Investments() {
     investmentAccounts,
     investmentTransactions,
     investmentPrices,
+    investmentPriceOverrides,
     investmentsLastSynced,
     saveInvestmentAccount,
     deleteInvestmentAccount,
@@ -65,6 +66,8 @@ export function Investments() {
     deleteInvestmentTransaction,
     refreshInvestmentPrices,
     isRefreshingPrices,
+    saveInvestmentPriceOverride,
+    deleteInvestmentPriceOverride,
     profile,
   } = useStore()
   const { session } = useSession()
@@ -72,6 +75,13 @@ export function Investments() {
   const userFirstName = firstName(profile?.name)
   const exportBrand = userFirstName ? `${userFirstName}'s Budget Planner Plus` : 'Budget Planner Plus'
   const [isExportingPdf, setIsExportingPdf] = useState(false)
+
+  // A manual override always wins over the shared, ticker-keyed cache — see
+  // investment_price_overrides. Merged once here so every price lookup below picks it up.
+  const prices = useMemo(
+    () => ({ ...investmentPrices, ...investmentPriceOverrides }),
+    [investmentPrices, investmentPriceOverrides],
+  )
 
   const syncMutation = useMutation({
     mutationFn: syncPlaidInvestments,
@@ -92,6 +102,7 @@ export function Investments() {
   const [editingTransaction, setEditingTransaction] = useState<
     (Partial<InvestmentTransaction> & { accountId: string }) | null
   >(null)
+  const [editingPriceOverride, setEditingPriceOverride] = useState<{ symbol: string; price: number } | null>(null)
 
   // Crypto now has its own dedicated page (see InvestmentsCrypto) — accounts created
   // there are typed 'crypto' and shouldn't also show up here. A brokerage account that
@@ -116,7 +127,7 @@ export function Investments() {
     [nonCryptoAccounts, nonCryptoTransactions],
   )
   const holdingCount = allHoldings.length
-  const portfolioValue = marketValue(allHoldings, investmentPrices)
+  const portfolioValue = marketValue(allHoldings, prices)
   const unrealizedGain = portfolioValue - invested
 
   // Every symbol currently logged on a non-crypto account — Finnhub is queried once per
@@ -193,7 +204,7 @@ export function Investments() {
           y = margin
         }
         const accountCostBasis = holdings.reduce((sum, h) => sum + h.costBasis, 0)
-        const accountMarketValue = marketValue(holdings, investmentPrices)
+        const accountMarketValue = marketValue(holdings, prices)
 
         doc.setFontSize(12)
         doc.setTextColor(20)
@@ -217,7 +228,7 @@ export function Investments() {
             margin: { left: margin, right: margin },
             head: [['Symbol', 'Qty', 'Avg Cost', 'Cost Basis', 'Price Now', 'Market Value', 'Gain/Loss']],
             body: holdings.map((h) => {
-              const priceNow = investmentPrices[h.symbol]
+              const priceNow = prices[h.symbol]
               const value = priceNow != null ? priceNow * h.quantity : null
               const gain = value != null ? value - h.costBasis : null
               return [
@@ -368,7 +379,7 @@ export function Investments() {
 
       {allHoldings.length > 0 && (
         <Card title="Gain/loss by holding">
-          <HoldingsGainLoss holdings={allHoldings} prices={investmentPrices} />
+          <HoldingsGainLoss holdings={allHoldings} prices={prices} />
         </Card>
       )}
 
@@ -386,7 +397,11 @@ export function Investments() {
               key={account.id}
               account={account}
               transactions={nonCryptoTransactions.filter((t) => t.accountId === account.id)}
-              prices={investmentPrices}
+              prices={prices}
+              overrides={investmentPriceOverrides}
+              onEditPriceOverride={(symbol) =>
+                setEditingPriceOverride({ symbol, price: investmentPriceOverrides[symbol] ?? prices[symbol] ?? 0 })
+              }
               onEditAccount={() => setEditingAccount({ ...account })}
               onDeleteAccount={() => {
                 if (window.confirm(`Delete "${account.name}" and all its transactions? This cannot be undone.`))
@@ -592,6 +607,56 @@ export function Investments() {
           </div>
         </div>
       )}
+
+      {editingPriceOverride && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/30 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+            <h2 className="font-display mb-1.5 text-[19px] text-[var(--ink)]">
+              Set price for {editingPriceOverride.symbol}
+            </h2>
+            <p className="mb-4 text-[12.5px] text-[var(--text-soft)]">
+              Use this when the symbol is shared by more than one coin or stock and "Price now" keeps fetching the
+              wrong one — a manual price here always wins, and won't be overwritten by "Price now".
+            </p>
+            <label className="mb-6 block">
+              <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-soft)]">Price per unit</span>
+              <ClearableNumberInput
+                value={editingPriceOverride.price}
+                onCommit={(price) => setEditingPriceOverride({ ...editingPriceOverride, price })}
+                className="input font-mono"
+              />
+            </label>
+            <div className="flex gap-3">
+              {investmentPriceOverrides[editingPriceOverride.symbol] != null && (
+                <button
+                  onClick={() => {
+                    deleteInvestmentPriceOverride(editingPriceOverride.symbol)
+                    setEditingPriceOverride(null)
+                  }}
+                  className="flex-1 rounded-lg border border-[var(--border)] py-2.5 text-[13px] font-medium text-[var(--warn)] hover:bg-[var(--warn-soft)]"
+                >
+                  Clear override
+                </button>
+              )}
+              <button
+                onClick={() => setEditingPriceOverride(null)}
+                className="flex-1 rounded-lg border border-[var(--border)] py-2.5 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--paper)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  saveInvestmentPriceOverride(editingPriceOverride.symbol, editingPriceOverride.price)
+                  setEditingPriceOverride(null)
+                }}
+                className="flex-1 rounded-lg bg-[var(--primary)] py-2.5 text-[13px] font-medium text-white hover:opacity-90"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -600,6 +665,8 @@ function AccountCard({
   account,
   transactions,
   prices,
+  overrides,
+  onEditPriceOverride,
   onEditAccount,
   onDeleteAccount,
   onAddTransaction,
@@ -612,6 +679,8 @@ function AccountCard({
   account: InvestmentAccount
   transactions: InvestmentTransaction[]
   prices: Record<string, number>
+  overrides: Record<string, number>
+  onEditPriceOverride: (symbol: string) => void
   onEditAccount: () => void
   onDeleteAccount: () => void
   onAddTransaction: () => void
@@ -689,6 +758,7 @@ function AccountCard({
               <tbody>
                 {holdings.map((h) => {
                   const priceNow = prices[h.symbol]
+                  const isOverridden = overrides[h.symbol] != null
                   const value = priceNow != null ? priceNow * h.quantity : null
                   const gain = value != null ? value - h.costBasis : null
                   const gainPct = gain != null && h.costBasis > 0 ? (gain / h.costBasis) * 100 : null
@@ -699,7 +769,24 @@ function AccountCard({
                       <td className="px-3 py-2 text-right font-mono">{formatUnitPrice(h.avgCost)}</td>
                       <td className="px-3 py-2 text-right font-mono">{formatMoney(h.costBasis)}</td>
                       <td className="px-3 py-2 text-right font-mono">
-                        {priceNow != null ? formatUnitPrice(priceNow) : '—'}
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => onEditPriceOverride(h.symbol)}
+                            className={`grid h-5 w-5 shrink-0 place-items-center rounded ${
+                              isOverridden
+                                ? 'text-[var(--primary)] hover:bg-[var(--primary-soft)]'
+                                : 'text-[var(--text-soft)] hover:bg-[var(--paper)]'
+                            }`}
+                            title={
+                              isOverridden
+                                ? 'Price is manually set — "Price now" won\'t overwrite it'
+                                : 'Manually set this price (for a symbol shared by more than one coin/stock)'
+                            }
+                          >
+                            {isOverridden ? <Pin size={11} /> : <PinOff size={11} />}
+                          </button>
+                          {priceNow != null ? formatUnitPrice(priceNow) : '—'}
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-right font-mono">{value != null ? formatMoney(value) : '—'}</td>
                       <td
