@@ -16,6 +16,13 @@
 // is overwhelmingly the intended one — and falling back to CoinGecko's search endpoint (which
 // itself ranks by relevance/market cap) for anything not in that top slice.
 //
+// Precious metals (XAU/XAG, the ISO 4217-style spot-price codes for gold/silver — there's no
+// dedicated "metal" asset type in this app, users just log these as a stock/other holding) go
+// through goldprice.dev instead: Finnhub's free quote endpoint doesn't cover commodities, and
+// this is a no-key, no-rate-limit JSON API purpose-built for spot metal prices. Checked by
+// symbol before the asset-type-based crypto/stock split below, since it doesn't matter what
+// asset type the user filed the holding under.
+//
 // verify_jwt is off (matches parse-receipt): the platform-level JWT gate also blocks CORS
 // preflight OPTIONS requests, which never carry an Authorization header. Auth is checked
 // manually below instead, exactly as strictly as verify_jwt would — this also keeps the
@@ -67,14 +74,19 @@ Deno.serve(async (req: Request) => {
     if (s?.symbol) unique.set(s.symbol, s.assetType)
   }
 
-  const cryptoSymbols = [...unique.entries()].filter(([, t]) => t === 'crypto').map(([s]) => s)
-  const otherSymbols = [...unique.entries()].filter(([, t]) => t !== 'crypto')
+  // Metal symbols are recognized by the ticker itself, ahead of the asset-type split below —
+  // it doesn't matter whether the user filed a gold/silver holding as "stock" or "other".
+  const metalSymbols = [...unique.keys()].filter((s) => METAL_SYMBOLS.has(s.toUpperCase()))
+  const remaining = [...unique.entries()].filter(([s]) => !METAL_SYMBOLS.has(s.toUpperCase()))
+  const cryptoSymbols = remaining.filter(([, t]) => t === 'crypto').map(([s]) => s)
+  const otherSymbols = remaining.filter(([, t]) => t !== 'crypto')
 
-  const [cryptoQuotes, otherQuotes] = await Promise.all([
+  const [metalQuotes, cryptoQuotes, otherQuotes] = await Promise.all([
+    Promise.all(metalSymbols.map((symbol) => quoteMetal(symbol))),
     quoteCrypto(cryptoSymbols),
     Promise.all(otherSymbols.map(([symbol]) => quoteFinnhub(symbol))),
   ])
-  const quotes = [...cryptoQuotes, ...otherQuotes]
+  const quotes = [...metalQuotes, ...cryptoQuotes, ...otherQuotes]
 
   const found = quotes.filter((q): q is { symbol: string; price: number } => q.price !== null)
   const skipped = quotes.filter((q) => q.price === null).map((q) => q.symbol)
@@ -117,6 +129,29 @@ async function quoteFinnhub(symbol: string): Promise<{ symbol: string; price: nu
     return { symbol, price: data.c as number }
   } catch (err) {
     console.error('Finnhub quote error', symbol, err)
+    return { symbol, price: null }
+  }
+}
+
+// --- Precious metals (goldprice.dev) ---
+
+// ISO 4217-style spot codes for gold/silver — the two a personal portfolio realistically holds.
+// Platinum/palladium (XPT/XPD) aren't included since nothing in this app creates them yet, but
+// goldprice.dev supports the same URL shape for them if that's ever needed.
+const METAL_SYMBOLS = new Set(['XAU', 'XAG'])
+
+async function quoteMetal(symbol: string): Promise<{ symbol: string; price: number | null }> {
+  try {
+    const res = await fetch(`https://api.goldprice.dev/v1/prices?symbol=${symbol.toUpperCase()}-USD-SPOT`)
+    if (!res.ok) {
+      console.error('goldprice.dev non-OK response', symbol, res.status)
+      return { symbol, price: null }
+    }
+    const data = await res.json()
+    const price = Number(data?.symbols?.[0]?.price)
+    return { symbol, price: Number.isFinite(price) && price > 0 ? price : null }
+  } catch (err) {
+    console.error('goldprice.dev error', symbol, err)
     return { symbol, price: null }
   }
 }
