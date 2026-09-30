@@ -18,10 +18,14 @@
 //
 // Precious metals (XAU/XAG, the ISO 4217-style spot-price codes for gold/silver — there's no
 // dedicated "metal" asset type in this app, users just log these as a stock/other holding) go
-// through goldprice.dev instead: Finnhub's free quote endpoint doesn't cover commodities, and
-// this is a no-key, no-rate-limit JSON API purpose-built for spot metal prices. Checked by
-// symbol before the asset-type-based crypto/stock split below, since it doesn't matter what
-// asset type the user filed the holding under.
+// through metals.dev when a METALS_DEV_API_KEY is configured — a dedicated spot-price API, true
+// accurate prices, one call for both. Without that key, falls back to Finnhub, treating GLD/SLV
+// (the gold/silver ETFs) as tradable proxies: they're ordinary NYSE Arca stock tickers, so the
+// same quoteFinnhub() call used for every other stock works with no new API/key, at the cost of
+// tracking a fraction of a troy ounce that slowly shrinks over time as the fund's own expense
+// ratio eats into its holdings — see the precious-metals section below for details. Checked by
+// symbol before the asset-type-based crypto/stock split, since it doesn't matter what asset type
+// the user filed the metal holding under.
 //
 // verify_jwt is off (matches parse-receipt): the platform-level JWT gate also blocks CORS
 // preflight OPTIONS requests, which never carry an Authorization header. Auth is checked
@@ -76,8 +80,8 @@ Deno.serve(async (req: Request) => {
 
   // Metal symbols are recognized by the ticker itself, ahead of the asset-type split below —
   // it doesn't matter whether the user filed a gold/silver holding as "stock" or "other".
-  const metalSymbols = [...unique.keys()].filter((s) => METAL_SYMBOLS.has(s.toUpperCase()))
-  const remaining = [...unique.entries()].filter(([s]) => !METAL_SYMBOLS.has(s.toUpperCase()))
+  const metalSymbols = [...unique.keys()].filter((s) => s.toUpperCase() in METAL_PROXY_TICKERS)
+  const remaining = [...unique.entries()].filter(([s]) => !(s.toUpperCase() in METAL_PROXY_TICKERS))
   const cryptoSymbols = remaining.filter(([, t]) => t === 'crypto').map(([s]) => s)
   const otherSymbols = remaining.filter(([, t]) => t !== 'crypto')
 
@@ -133,27 +137,73 @@ async function quoteFinnhub(symbol: string): Promise<{ symbol: string; price: nu
   }
 }
 
-// --- Precious metals (goldprice.dev) ---
+// --- Precious metals ---
+//
+// Primary source is metals.dev, a dedicated spot-price API returning a true, accurate gold and
+// silver price directly (one call covers both) — requires a free METALS_DEV_API_KEY (sign up at
+// metals.dev, no credit card). If that key isn't configured, falls back to treating GLD/SLV (the
+// gold/silver ETFs) as tradable proxies via the same Finnhub quote already used for every other
+// stock: no new API/key, but each share represents a *fraction* of a troy ounce that slowly
+// shrinks over time as the fund's own expense ratio eats into its holdings, so it's an
+// approximation, not a true spot price.
 
-// ISO 4217-style spot codes for gold/silver — the two a personal portfolio realistically holds.
-// Platinum/palladium (XPT/XPD) aren't included since nothing in this app creates them yet, but
-// goldprice.dev supports the same URL shape for them if that's ever needed.
-const METAL_SYMBOLS = new Set(['XAU', 'XAG'])
+const METAL_DEV_KEYS: Record<string, string> = { XAU: 'gold', XAG: 'silver' }
 
-async function quoteMetal(symbol: string): Promise<{ symbol: string; price: number | null }> {
+let metalsDevCache: { metals: Record<string, number>; fetchedAt: number } | null = null
+const METALS_DEV_CACHE_TTL_MS = 5 * 60 * 1000
+
+// One call returns every metal metals.dev tracks, so it's fetched once per invocation (and
+// briefly cached across invocations on a warm isolate) rather than once per requested symbol.
+async function fetchMetalsDev(): Promise<Record<string, number> | null> {
+  const apiKey = Deno.env.get('METALS_DEV_API_KEY')
+  if (!apiKey) return null
+  if (metalsDevCache && Date.now() - metalsDevCache.fetchedAt < METALS_DEV_CACHE_TTL_MS) {
+    return metalsDevCache.metals
+  }
   try {
-    const res = await fetch(`https://api.goldprice.dev/v1/prices?symbol=${symbol.toUpperCase()}-USD-SPOT`)
+    const res = await fetch(`https://api.metals.dev/v1/latest?api_key=${apiKey}&currency=USD&unit=toz`)
     if (!res.ok) {
-      console.error('goldprice.dev non-OK response', symbol, res.status)
-      return { symbol, price: null }
+      console.error('metals.dev non-OK response', res.status)
+      return null
     }
     const data = await res.json()
-    const price = Number(data?.symbols?.[0]?.price)
-    return { symbol, price: Number.isFinite(price) && price > 0 ? price : null }
+    const metals = data?.metals as Record<string, number> | undefined
+    if (!metals) return null
+    metalsDevCache = { metals, fetchedAt: Date.now() }
+    return metals
   } catch (err) {
-    console.error('goldprice.dev error', symbol, err)
-    return { symbol, price: null }
+    console.error('metals.dev error', err)
+    return null
   }
+}
+
+// Each entry's ozPerShare is the metal actually backing one share of the proxy ETF right now —
+// not a fixed design constant, since it drifts slowly downward every year as the fund's expense
+// ratio consumes a sliver of its holdings. Re-derive these occasionally (each fund publishes its
+// own holdings/shares-outstanding, or back it out from NAV ÷ published spot price) rather than
+// trusting them indefinitely.
+//
+// GLD (SPDR Gold Shares): 0.0917 oz/share, from GLD's own reported NAV ($381.70) ÷ the LBMA gold
+// price ($4,163.40) on 2026-09-29.
+// SLV (iShares Silver Trust): 0.93 oz/share, from SLV's reported ounces-in-trust ÷ shares
+// outstanding as of 2026-09-28.
+const METAL_PROXY_TICKERS: Record<string, { proxy: string; ozPerShare: number }> = {
+  XAU: { proxy: 'GLD', ozPerShare: 0.0917 },
+  XAG: { proxy: 'SLV', ozPerShare: 0.93 },
+}
+
+async function quoteMetal(symbol: string): Promise<{ symbol: string; price: number | null }> {
+  const devKey = METAL_DEV_KEYS[symbol.toUpperCase()]
+  if (devKey) {
+    const metals = await fetchMetalsDev()
+    const price = metals?.[devKey]
+    if (typeof price === 'number' && price > 0) return { symbol, price }
+  }
+
+  const proxy = METAL_PROXY_TICKERS[symbol.toUpperCase()]
+  if (!proxy) return { symbol, price: null }
+  const quote = await quoteFinnhub(proxy.proxy)
+  return { symbol, price: quote.price != null ? quote.price / proxy.ozPerShare : null }
 }
 
 // --- CoinGecko ---
