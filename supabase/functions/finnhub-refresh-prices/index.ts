@@ -213,16 +213,15 @@ async function searchCoingeckoBySymbol(symbol: string): Promise<number | null> {
   }
 }
 
-// Ticker collisions are real: more than one independent coin can use the same symbol (several
-// small/older projects share "ETN", for instance), and both the market-cap list and the search
-// fallback above just pick whichever coin with that ticker ranks highest — not necessarily the
-// one actually meant. This override wins over both for a ticker already known to collide.
-// Confirmed case: Electroneum's real ETN (~$0.0000257) was losing to an unrelated, higher
-// market-cap "ETN" (~$0.0023, ~90x off) that the automatic resolution picked instead. Add to
-// this map as more mismatches like this one turn up.
-const KNOWN_COIN_IDS: Record<string, string> = {
-  ETN: 'electroneum',
-}
+// Ticker collisions are real, and not always between two coins CoinGecko itself tracks: a
+// user's "ETN" holding turned out to be a $25K-market-cap DEX-only token that merely happens
+// to share Electroneum's name and ticker — CoinGecko's actual "electroneum" listing (~$0.0023,
+// $42M market cap) is a real but *different* coin, not a resolution bug to route around. There
+// is no ticker-based way to tell these apart; only a contract address could. So this map is
+// NOT "the biggest coin wins" fixed here — it exists for the opposite situation: pin a ticker
+// to a specific CoinGecko id only once confirmed (e.g. by comparing against the exchange the
+// account is actually on) that the automatic top-market-cap pick is the coin actually meant.
+const KNOWN_COIN_IDS: Record<string, string> = {}
 
 async function quoteCrypto(symbols: string[]): Promise<{ symbol: string; price: number | null }[]> {
   if (symbols.length === 0) return []
