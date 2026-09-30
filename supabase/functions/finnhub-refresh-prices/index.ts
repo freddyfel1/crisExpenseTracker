@@ -171,9 +171,29 @@ async function fetchTopCoinsBySymbol(): Promise<Map<string, { id: string; price:
   return bySymbol
 }
 
-// Best-effort lookup for a ticker not in the top-500-by-market-cap set: CoinGecko's search
-// endpoint ranks matches by relevance (which tracks market cap), so the first coin result is
-// used, then priced individually.
+async function priceByCoinId(id: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${COINGECKO_BASE}/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=usd`, {
+      headers: coingeckoHeaders(),
+    })
+    if (!res.ok) {
+      console.error('CoinGecko simple/price non-OK response', id, res.status)
+      return null
+    }
+    const data = await res.json()
+    const price = data?.[id]?.usd
+    return typeof price === 'number' && price > 0 ? price : null
+  } catch (err) {
+    console.error('CoinGecko simple/price error', id, err)
+    return null
+  }
+}
+
+// Best-effort lookup for a ticker not in the top-500-by-market-cap set, and not in
+// KNOWN_COIN_IDS below: CoinGecko's search endpoint ranks matches by relevance (which tracks
+// market cap), so the first coin result with a matching symbol is used. This is the same
+// "pick the biggest coin with this ticker" heuristic as the market-cap list, and can be wrong
+// for the same reason — see KNOWN_COIN_IDS.
 async function searchCoingeckoBySymbol(symbol: string): Promise<number | null> {
   try {
     const searchRes = await fetch(`${COINGECKO_BASE}/search?query=${encodeURIComponent(symbol)}`, {
@@ -186,23 +206,22 @@ async function searchCoingeckoBySymbol(symbol: string): Promise<number | null> {
     const searchData = await searchRes.json()
     const coins = (searchData?.coins ?? []) as { id: string; symbol: string }[]
     const match = coins.find((c) => c.symbol.toUpperCase() === symbol.toUpperCase()) ?? coins[0]
-    if (!match) return null
-
-    const priceRes = await fetch(
-      `${COINGECKO_BASE}/simple/price?ids=${encodeURIComponent(match.id)}&vs_currencies=usd`,
-      { headers: coingeckoHeaders() },
-    )
-    if (!priceRes.ok) {
-      console.error('CoinGecko simple/price non-OK response', symbol, priceRes.status)
-      return null
-    }
-    const priceData = await priceRes.json()
-    const price = priceData?.[match.id]?.usd
-    return typeof price === 'number' && price > 0 ? price : null
+    return match ? priceByCoinId(match.id) : null
   } catch (err) {
-    console.error('CoinGecko search/price error', symbol, err)
+    console.error('CoinGecko search error', symbol, err)
     return null
   }
+}
+
+// Ticker collisions are real: more than one independent coin can use the same symbol (several
+// small/older projects share "ETN", for instance), and both the market-cap list and the search
+// fallback above just pick whichever coin with that ticker ranks highest — not necessarily the
+// one actually meant. This override wins over both for a ticker already known to collide.
+// Confirmed case: Electroneum's real ETN (~$0.0000257) was losing to an unrelated, higher
+// market-cap "ETN" (~$0.0023, ~90x off) that the automatic resolution picked instead. Add to
+// this map as more mismatches like this one turn up.
+const KNOWN_COIN_IDS: Record<string, string> = {
+  ETN: 'electroneum',
 }
 
 async function quoteCrypto(symbols: string[]): Promise<{ symbol: string; price: number | null }[]> {
@@ -211,6 +230,11 @@ async function quoteCrypto(symbols: string[]): Promise<{ symbol: string; price: 
 
   return Promise.all(
     symbols.map(async (symbol) => {
+      const knownId = KNOWN_COIN_IDS[symbol.toUpperCase()]
+      if (knownId) {
+        const price = await priceByCoinId(knownId)
+        if (price != null) return { symbol, price }
+      }
       const hit = bySymbol.get(symbol.toUpperCase())
       if (hit) return { symbol, price: hit.price }
       const price = await searchCoingeckoBySymbol(symbol)
