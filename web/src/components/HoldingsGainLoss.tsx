@@ -1,6 +1,6 @@
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Holding } from '../data/selectors'
-import { formatMoney, formatMoneyCompact } from '../utils/format'
+import { formatMoney, formatMoneyCompact, formatUnitPrice } from '../utils/format'
 
 // formatMoneyCompact only shortens amounts >= $1,000 — below that it falls back to full
 // currency with cents, which is too wide for a Y-axis tick label. Gain/loss on a single
@@ -109,7 +109,7 @@ function HoldingTooltip({ active, payload }: { active?: boolean; payload?: { pay
       <p className="mb-1 font-semibold text-[var(--ink)]">{h.symbol}</p>
       <dl className="space-y-0.5">
         <Row label="Qty" value={String(h.quantity)} />
-        <Row label="Price now" value={h.priceNow != null ? formatMoney(h.priceNow) : '—'} />
+        <Row label="Price now" value={h.priceNow != null ? formatUnitPrice(h.priceNow) : '—'} />
         <Row label="Market value" value={h.value != null ? formatMoney(h.value) : '—'} />
         <Row
           label="Gain/loss"

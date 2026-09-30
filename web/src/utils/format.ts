@@ -8,6 +8,21 @@ export const formatMoneyCompact = (amount: number): string =>
     ? `$${(amount / 1000).toFixed(1)}k`
     : formatMoney(amount)
 
+// For a per-unit price (avg cost, price now, buy price) rather than a total — a smaller-cap
+// crypto's per-coin price is routinely a fraction of a cent (e.g. Electroneum around
+// $0.000015), and formatMoney's fixed 2 decimals would silently round that to $0.00. Shows
+// up to 6 fraction digits for anything under $1, otherwise falls back to ordinary 2-decimal
+// currency formatting.
+export const formatUnitPrice = (amount: number): string =>
+  amount !== 0 && Math.abs(amount) < 1
+    ? amount.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 6,
+      })
+    : formatMoney(amount)
+
 // Parses the YYYY-MM-DD part as a local calendar date, not UTC — `new Date(iso)`
 // on a date-only string parses as UTC midnight, which rolls back a day when
 // displayed in any timezone behind UTC.
