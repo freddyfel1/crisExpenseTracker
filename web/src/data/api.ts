@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type {
   AssetType,
@@ -591,9 +592,31 @@ export interface ParsedReceipt {
   error?: string
 }
 
+// supabase-js's FunctionsHttpError always carries the same generic message ("Edge Function
+// returned a non-2xx status code") — the edge function's actual reason (e.g. "Invalid session"
+// when the caller's session has expired or been revoked) only lives in the response body, which
+// nothing reads by default. This recovers it, and turns an expired-session response into a
+// message that tells the user what to actually do about it.
+async function describeFunctionError(error: unknown): Promise<Error> {
+  if (!(error instanceof FunctionsHttpError)) {
+    return error instanceof Error ? error : new Error('Request failed.')
+  }
+  let message: string | undefined
+  try {
+    const body = await error.context.json()
+    message = typeof body?.error === 'string' ? body.error : undefined
+  } catch {
+    // Response body wasn't JSON — fall through to the generic message below.
+  }
+  if (message === 'Invalid session' || message === 'Missing authorization') {
+    return new Error('Your session expired — please refresh the page and sign in again.')
+  }
+  return new Error(message ?? error.message)
+}
+
 export async function parseReceipt(path: string): Promise<ParsedReceipt> {
   const { data, error } = await supabase.functions.invoke('parse-receipt', { body: { path } })
-  if (error) throw error
+  if (error) throw await describeFunctionError(error)
   return data as ParsedReceipt
 }
 
@@ -629,7 +652,7 @@ export async function fetchPlaidConnections(): Promise<PlaidConnection[]> {
 
 export async function createPlaidLinkToken(redirectUri: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke('plaid-link-token', { body: { redirect_uri: redirectUri } })
-  if (error) throw error
+  if (error) throw await describeFunctionError(error)
   return data.link_token as string
 }
 
@@ -637,17 +660,17 @@ export async function exchangePlaidPublicToken(publicToken: string, institutionN
   const { error } = await supabase.functions.invoke('plaid-exchange-token', {
     body: { public_token: publicToken, institution_name: institutionName },
   })
-  if (error) throw error
+  if (error) throw await describeFunctionError(error)
 }
 
 export async function disconnectPlaidBank(id: string) {
   const { error } = await supabase.functions.invoke('plaid-disconnect-bank', { body: { id } })
-  if (error) throw error
+  if (error) throw await describeFunctionError(error)
 }
 
 export async function syncPlaidTransactions(): Promise<{ synced: number; removed: number; items: number }> {
   const { data, error } = await supabase.functions.invoke('plaid-sync-transactions', { body: {} })
-  if (error) throw error
+  if (error) throw await describeFunctionError(error)
   return data
 }
 
@@ -658,7 +681,7 @@ export async function syncPlaidInvestments(scope?: 'crypto'): Promise<{
   skipped: number
 }> {
   const { data, error } = await supabase.functions.invoke('plaid-sync-investments', { body: { scope } })
-  if (error) throw error
+  if (error) throw await describeFunctionError(error)
   return data
 }
 
@@ -680,7 +703,7 @@ export async function refreshInvestmentPrices(
   symbols: { symbol: string; assetType: AssetType }[],
 ): Promise<{ prices: Record<string, number>; skipped: string[] }> {
   const { data, error } = await supabase.functions.invoke('finnhub-refresh-prices', { body: { symbols } })
-  if (error) throw error
+  if (error) throw await describeFunctionError(error)
   return data
 }
 
