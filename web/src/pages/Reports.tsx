@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Download, FileText } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Legend, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useStore } from '../data/store'
-import { firstName, formatMoney, monthKey } from '../utils/format'
+import { firstName, formatDate, formatMoney, monthKey, todayKey } from '../utils/format'
 import { resolveCategory } from '../utils/resolveCategory'
 import { Card } from '../components/Card'
 import { CategoryIcon } from '../components/CategoryIcon'
@@ -83,6 +83,29 @@ export function Reports() {
   }, [periodTransactions])
 
   const byIdCat = (key: string) => resolveCategory(categories, key === UNCATEGORIZED_KEY ? null : key)
+
+  // A standalone lookup, independent of the year/month filter above: "how much have I spent
+  // on X" is almost always asked about this year to date, so it defaults there and — unlike
+  // the chart's top-5 cap — covers every category, searched by name rather than browsed.
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name)),
+    [categories],
+  )
+  const [searchCategoryId, setSearchCategoryId] = useState('')
+  const [searchYear, setSearchYear] = useState(currentYear)
+  const isSearchYearToDate = searchYear === currentYear
+  const todayStr = todayKey()
+
+  const searchResults = useMemo(() => {
+    if (!searchCategoryId) return null
+    return transactions
+      .filter((t) => monthKey(t.date).slice(0, 4) === searchYear)
+      .filter((t) => categoryKey(t.categoryId) === searchCategoryId)
+      .filter((t) => !isSearchYearToDate || t.date.slice(0, 10) <= todayStr)
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [transactions, searchYear, searchCategoryId, isSearchYearToDate, todayStr])
+
+  const searchTotal = searchResults?.reduce((sum, t) => sum + t.amount, 0) ?? 0
 
   // Always plots all 12 months of the selected year, regardless of the month
   // filter, so the chart stays a full-year trend even when a month is picked.
@@ -270,6 +293,67 @@ export function Reports() {
           </button>
         </div>
       </div>
+
+      <Card title="Category search">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-[12px] text-[var(--text-soft)]">Category</label>
+            <select
+              value={searchCategoryId}
+              onChange={(e) => setSearchCategoryId(e.target.value)}
+              className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)]"
+            >
+              <option value="">Select a category…</option>
+              {sortedCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              <option value={UNCATEGORIZED_KEY}>Uncategorized</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] text-[var(--text-soft)]">Year</label>
+            <select
+              value={searchYear}
+              onChange={(e) => setSearchYear(e.target.value)}
+              className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)]"
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {searchCategoryId && searchResults && (
+          <div className="mt-4 border-t border-[var(--border-soft)] pt-4">
+            <p className="text-[13px] text-[var(--text-soft)]">
+              {byIdCat(searchCategoryId).name} {isSearchYearToDate ? 'so far in' : 'in'} {searchYear}
+            </p>
+            <p className="font-display text-[28px] text-[var(--ink)]">{formatMoney(searchTotal)}</p>
+            <p className="mb-2 text-[12px] text-[var(--text-soft)]">
+              {searchResults.length} transaction{searchResults.length === 1 ? '' : 's'}
+            </p>
+            <ul className="max-h-64 divide-y divide-[var(--border-soft)] overflow-y-auto">
+              {searchResults.map((t) => (
+                <li key={t.id} className="flex items-center justify-between py-2 text-[13px]">
+                  <div>
+                    <p className="font-medium text-[var(--ink)]">{t.merchant}</p>
+                    <p className="text-[12px] text-[var(--text-soft)]">{formatDate(t.date)}</p>
+                  </div>
+                  <span className="font-mono font-medium text-[var(--ink)]">{formatMoney(t.amount)}</span>
+                </li>
+              ))}
+              {searchResults.length === 0 && (
+                <li className="py-4 text-center text-[13px] text-[var(--text-soft)]">No transactions found.</li>
+              )}
+            </ul>
+          </div>
+        )}
+      </Card>
 
       <Card ref={chartCardRef} title={`Top categories, ${periodLabel}`}>
         <div className="h-[280px] w-full">
